@@ -91,4 +91,30 @@ describe('privacySlotRegion', () => {
   it('returns null when there are no monitors', () => {
     expect(privacySlotRegion([])).toBeNull()
   })
+
+  it('uses the last monitor when three outputs are present', () => {
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0, focused: false })
+    const dell = monitor({
+      id: 2,
+      name: 'DP-3',
+      x: 200,
+      y: 900,
+      width: 1920,
+      height: 1080,
+      scale: 1,
+      focused: false,
+    })
+    expect(privacySlotRegion([monitor(), hdmi, dell])).toMatchObject({ output: 'DP-3' })
+  })
+
+  it('shrinks the slot when the last monitor is smaller than the default card', () => {
+    const tiny = monitor({ name: 'eDP-1', width: 900, height: 600, scale: 1 })
+    expect(privacySlotRegion([tiny])).toEqual({
+      output: 'eDP-1',
+      x: 900 - 300 - 16,
+      y: 600 - 200 - 16,
+      width: 300,
+      height: 200,
+    })
+  })
 })
