@@ -13,10 +13,18 @@ export type MirrorPort = {
 
 type ClockPort = {
   readonly ticks: AsyncIterable<void>
+  now?(): number
+}
+
+export type SlideCard = {
+  readonly kind: 'slide'
+  readonly direction: 'left' | 'right' | 'up' | 'down'
+  readonly fromLabel: string
+  readonly toLabel: string
 }
 
 export type PrivacyCardPort = {
-  publish(card: { readonly appLabel: string } | null): void
+  publish(card: { readonly appLabel: string } | SlideCard | null): void
 }
 
 export type FollowcastPorts = {

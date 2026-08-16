@@ -46,7 +46,7 @@ async function run(
   ready: PromiseWithResolvers<void>,
 ): Promise<void> {
   let started = false
-  let state: SessionState = { last: null }
+  let state: SessionState = { last: null, pendingFollow: null }
   try {
     const first = toDesktopSnapshot(
       await ports.hyprland.clients(),
@@ -95,10 +95,16 @@ function apply(
   options: FollowOptions,
   ports: FollowcastPorts,
 ): SessionState {
-  const step = reduceSession(state, snapshot, {
-    ...options,
-    privacyRegion: privacyRegionFrom(snapshot) ?? privacySlotRegion(snapshot.monitors),
-  })
+  const nowMs = ports.clock.now !== undefined ? ports.clock.now() : Date.now()
+  const step = reduceSession(
+    state,
+    snapshot,
+    {
+      ...options,
+      privacyRegion: privacyRegionFrom(snapshot) ?? privacySlotRegion(snapshot.monitors),
+    },
+    nowMs,
+  )
   if (step.command !== null) {
     ports.mirror.send(step.command)
   }
@@ -108,6 +114,13 @@ function apply(
     // Stryker disable next-line ConditionalExpression: equivalent — reduceSession always leaves last set
     if (last !== null && last.kind === 'privacy') {
       card.publish({ appLabel: last.appLabel })
+    } else if (last !== null && last.kind === 'transition') {
+      card.publish({
+        kind: 'slide',
+        direction: last.direction,
+        fromLabel: last.fromLabel,
+        toLabel: last.toLabel,
+      })
     } else {
       card.publish(null)
     }

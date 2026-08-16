@@ -77,8 +77,21 @@ export type FollowDecision =
       readonly reason: PrivacyReason
     }
 
+export type TransitionDecision = {
+  readonly kind: 'transition'
+  readonly fromOutput: string
+  readonly toOutput: string
+  readonly direction: 'left' | 'right' | 'up' | 'down'
+  readonly fromLabel: string
+  readonly toLabel: string
+  readonly untilMs: number
+}
+
+export type SessionLast = FollowDecision | TransitionDecision
+
 export type SessionState = {
-  readonly last: FollowDecision | null
+  readonly last: SessionLast | null
+  readonly pendingFollow: Extract<FollowDecision, { kind: 'follow' }> | null
 }
 
 export type SessionStep = {

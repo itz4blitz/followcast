@@ -21,6 +21,19 @@ export function filePrivacyCard(runtimeDir: string): PrivacyCardPort {
         writeFileSync(jsonPath, `${JSON.stringify({ visible: false })}\n`)
         return
       }
+      if ('kind' in card) {
+        writeFileSync(
+          jsonPath,
+          `${JSON.stringify({
+            visible: true,
+            kind: 'slide',
+            direction: card.direction,
+            fromLabel: card.fromLabel,
+            toLabel: card.toLabel,
+          })}\n`,
+        )
+        return
+      }
       writeFileSync(jsonPath, `${JSON.stringify({ visible: true, appLabel: card.appLabel })}\n`)
       writeFileSync(
         svgPath,

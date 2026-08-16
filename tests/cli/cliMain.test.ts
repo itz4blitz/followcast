@@ -161,7 +161,7 @@ describe('buildCliMain', () => {
     const controller = new AbortController()
     let stored: SharePolicy = DEFAULT_POLICY
     const sent: string[] = []
-    const published: Array<{ appLabel: string } | null> = []
+    const published: Array<{ appLabel?: string; kind?: string } | null> = []
     const running = buildCliMain({
       argv: [],
       stdout: { write: () => {} },

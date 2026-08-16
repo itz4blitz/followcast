@@ -67,6 +67,7 @@ type World = {
   started: string[]
   sent: string[]
   stops: number
+  now: number
 }
 
 function world(seed: Partial<World> = {}): World {
@@ -79,6 +80,7 @@ function world(seed: Partial<World> = {}): World {
     started: [],
     sent: [],
     stops: 0,
+    now: 0,
     ...seed,
   }
 }
@@ -102,7 +104,10 @@ function portsOf(w: World) {
         w.stops += 1
       },
     },
-    clock: { ticks: w.ticks },
+    clock: {
+      ticks: w.ticks,
+      now: () => w.now,
+    },
   }
 }
 
@@ -150,7 +155,14 @@ describe('runFollowcast', () => {
     w.active = { address: '0xcode' }
     w.events.push('activewindowv2>>0xcode')
     await waitUntil(() => w.sent.length === 2)
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'", "--region '2600,40 400x300 HDMI-A-1'"])
+    expect(w.sent).toEqual([
+      "--region '10,20 800x600 DP-1'",
+      "--region '4624,1154 480x270 HDMI-A-1'",
+    ])
+    w.now = 500
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.length === 3)
+    expect(w.sent[2]).toBe("--region '2600,40 400x300 HDMI-A-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -224,10 +236,18 @@ describe('runFollowcast', () => {
     w.active = { address: '0xcode' }
     w.events.push('activewindowv2>>0xcode')
     await waitUntil(() => w.sent.length === 2)
+    w.now = 500
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.length === 3)
+    w.now = 500
     w.active = { address: '0xfox' }
     w.events.push('activewindowv2>>0xfox')
-    await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '10,20 800x600 DP-1'")
+    await waitUntil(() => w.sent.length === 4)
+    expect(w.sent[3]).toBe("--region '4624,1154 480x270 HDMI-A-1'")
+    w.now = 1000
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.length === 5)
+    expect(w.sent[4]).toBe("--region '10,20 800x600 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -250,10 +270,17 @@ describe('runFollowcast', () => {
     w.active = { address: '0xcode' }
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length === 2)
-    w.active = { address: '0xfox' }
+    w.now = 500
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '10,20 800x600 DP-1'")
+    w.active = { address: '0xfox' }
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.length === 4)
+    expect(w.sent[3]).toBe("--region '4624,1154 480x270 HDMI-A-1'")
+    w.now = 1000
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.length === 5)
+    expect(w.sent[4]).toBe("--region '10,20 800x600 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -357,6 +384,37 @@ describe('runFollowcast', () => {
     expect(w.sent).toEqual(["--region '4624,1154 480x270 HDMI-A-1'"])
     await shutdown(controller, w, handle.finished)
     expect(w.stops).toBe(1)
+  })
+
+  it('publishes a monitor slide then lands on the new display', async () => {
+    const w = world()
+    const published: Array<{ appLabel?: string; kind?: string; toLabel?: string } | null> = []
+    const controller = new AbortController()
+    const ports = {
+      ...portsOf(w),
+      privacyCard: {
+        publish: (card: { appLabel?: string; kind?: string; toLabel?: string } | null) => {
+          published.push(card)
+        },
+      },
+    }
+    const handle = startFollowcast(ports, options(), controller.signal)
+    await handle.ready
+    w.clients = [fox, code]
+    w.active = { address: '0xcode' }
+    w.events.push('activewindowv2>>0xcode')
+    await waitUntil(() => published.some((item) => item?.kind === 'slide'))
+    expect(published.at(-1)).toEqual({
+      kind: 'slide',
+      direction: 'right',
+      fromLabel: 'Display 1',
+      toLabel: 'Display 2',
+    })
+    w.now = 500
+    w.ticks.push(undefined)
+    await waitUntil(() => w.sent.at(-1) === "--region '2600,40 400x300 HDMI-A-1'")
+    expect(published.at(-1)).toBeNull()
+    await shutdown(controller, w, handle.finished)
   })
 
   it('clears the privacy card while sharing an allowed app', async () => {

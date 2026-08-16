@@ -13,6 +13,23 @@ describe('filePrivacyCard', () => {
     expect(readFileSync(cardSvgPath(dir), 'utf8')).toContain('Hidden by Followcast')
   })
 
+  it('writes a monitor slide beat', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'followcast-'))
+    filePrivacyCard(dir).publish({
+      kind: 'slide',
+      direction: 'right',
+      fromLabel: 'Display 1',
+      toLabel: 'Display 2',
+    })
+    expect(JSON.parse(readFileSync(cardStatePath(dir), 'utf8'))).toEqual({
+      visible: true,
+      kind: 'slide',
+      direction: 'right',
+      fromLabel: 'Display 1',
+      toLabel: 'Display 2',
+    })
+  })
+
   it('marks the card hidden when publish is cleared', () => {
     const dir = mkdtempSync(join(tmpdir(), 'followcast-'))
     const card = filePrivacyCard(dir)

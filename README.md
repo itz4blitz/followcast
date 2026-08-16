@@ -29,17 +29,23 @@ Add to `~/.config/hypr/hyprland.lua`:
 ```lua
 hl.permission({ binary = "/usr/bin/wl-mirror", type = "screencopy", mode = "allow" })
 
--- One shareable window. Keep it mapped (special workspaces capture
--- black in Discord) and park it off-screen so it is not a headed app.
+-- One shareable window. Discord stays on "loading" if the dummy is
+-- fully off-screen or on a special workspace. Clip two pixels onto
+-- the last monitor so the portal gets frames.
 o.window({ class = "^at\\.yrlf\\.wl_mirror$", title = "^Followcast$" }, {
   float = true,
   decorate = false,
+  border_size = 0,
+  rounding = 0,
+  no_shadow = true,
+  no_anim = true,
+  monitor = "DP-3",
   no_initial_focus = true,
   no_focus = true,
   no_follow_mouse = true,
   render_unfocused = true,
   size = { 1280, 720 },
-  move = { -2400, -2400 },
+  move = { 1438, 808 },
 })
 ```
 
@@ -73,8 +79,10 @@ followcast --deny-class zoom --deny-class skype
 2. In the share picker, open **Windows** and pick **Followcast**. There
    is only that one Followcast entry.
 3. Change focus as usual. The share follows the focused app only if that
-   monitor and app are on in the policy. When an app is muted, the same
-   window shows the **Hidden by Followcast** card.
+   monitor and app are on in the policy. Crossing monitors plays a short
+   Display 1 → Display 2 slide so viewers can tell you moved screens.
+   When an app is muted, the same window shows the **Hidden by Followcast**
+   card.
 4. Mute a monitor or app:
 
 ```bash
@@ -87,8 +95,8 @@ On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/blitz.followcas
 and add `blitz.followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
 calls `followcast status` / `followcast policy`.
 
-You should not see the Followcast dummy on your monitors. It is parked
-off-screen so Discord can still capture its frames. When something is
+You should not see a Followcast app window. The dummy hangs mostly off
+the last monitor so Discord can still get frames. When something is
 muted, a small **Hidden by Followcast** card is composited so the dummy
 has pixels to show; the bar chip is the control.
 
