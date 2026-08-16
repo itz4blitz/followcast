@@ -22,6 +22,12 @@ ALIASES = {
     "org.mozilla.thunderbird": "thunderbird",
     "org.mozilla.firefox": "firefox",
     "omarchy-discord": "discord",
+    "org.remmina.remmina": "remmina",
+    "zcode": "code",
+    "foot": "terminal",
+    "footclient": "terminal",
+    "code-url-handler": "visual-studio-code",
+    "code": "visual-studio-code",
 }
 
 
@@ -148,13 +154,23 @@ def dashboard_slugs() -> set[str]:
 
 
 def dash_icon(name: str, icon: str, keys: list[str], slugs: set[str]) -> str:
-    candidates = [ALIASES.get(slugify(icon), slugify(icon)), slugify(name)]
+    candidates = [slugify(icon), slugify(name)]
     for key in keys:
-        candidates.append(ALIASES.get(key, key))
+        candidates.append(key)
         candidates.append(slugify(key))
+        host = key.split("__", 1)[0]
+        if "-" in host:
+            rest = host.split("-", 1)[1]
+            candidates.append(rest)
+            candidates.append(rest.split(".")[0])
+    seen: set[str] = set()
     for candidate in candidates:
-        if candidate in slugs:
-            return f"{DASH_CDN}/{candidate}.png"
+        mapped = ALIASES.get(candidate, candidate)
+        if mapped == "" or mapped in seen:
+            continue
+        seen.add(mapped)
+        if mapped in slugs:
+            return f"{DASH_CDN}/{mapped}.png"
     return ""
 
 

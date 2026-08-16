@@ -29,17 +29,17 @@ Add to `~/.config/hypr/hyprland.lua`:
 ```lua
 hl.permission({ binary = "/usr/bin/wl-mirror", type = "screencopy", mode = "allow" })
 
--- One shareable window. Hidden on a special workspace so it is not a
--- picture-in-picture on your monitors. render_unfocused keeps the
--- picker preview live.
+-- One shareable window. Keep it mapped (special workspaces capture
+-- black in Discord) and park it off-screen so it is not a headed app.
 o.window({ class = "^at\\.yrlf\\.wl_mirror$", title = "^Followcast$" }, {
   float = true,
-  workspace = "special:followcast silent",
+  decorate = false,
   no_initial_focus = true,
   no_focus = true,
   no_follow_mouse = true,
   render_unfocused = true,
-  size = { 480, 270 },
+  size = { 1280, 720 },
+  move = { -2400, -2400 },
 })
 ```
 
@@ -87,10 +87,10 @@ On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/blitz.followcas
 and add `blitz.followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
 calls `followcast status` / `followcast policy`.
 
-You should not see the Followcast dummy on your monitors. It lives on a
-hidden special workspace. The share picker and the people on the call see
-it. When something is muted, a small **Hidden by Followcast** card is
-composited so the dummy has pixels to show; the bar chip is the control.
+You should not see the Followcast dummy on your monitors. It is parked
+off-screen so Discord can still capture its frames. When something is
+muted, a small **Hidden by Followcast** card is composited so the dummy
+has pixels to show; the bar chip is the control.
 
 ## Policy
 
