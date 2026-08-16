@@ -73,6 +73,13 @@ Panel {
     return n
   }
 
+  function instanceCount(className) {
+    var apps = selected && selected.apps ? selected.apps : []
+    var n = 0
+    for (var i = 0; i < apps.length; i++) if (apps[i].className === className) n++
+    return n
+  }
+
   function apply(payload) {
     try { var d = JSON.parse(String(payload)) } catch (e) { return }
     ready = true
@@ -208,13 +215,28 @@ Panel {
     return parts[parts.length - 1] || cls
   }
 
-  function iconSourceForClass(className) {
+  function dashIconUrl(className) {
+    var hit = root.catalogHit(className)
+    if (hit && String(hit.icon || "").indexOf("https://") === 0) return hit.icon
+    var name = root.displayNameForClass(className).toLowerCase()
+    var slug = name.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    if (!slug) return ""
+    return "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/" + slug + ".png"
+  }
+
+  function themeIconForClass(className) {
     var name = root.iconNameForClass(className)
     var themed = Quickshell.iconPath(name, true)
     if (themed && themed.length > 0) return themed
     var raw = Quickshell.iconPath(String(className || ""), true)
     if (raw && raw.length > 0) return raw
     return Quickshell.iconPath("application-x-executable", true)
+  }
+
+  function iconSourceForClass(className) {
+    var dash = root.dashIconUrl(className)
+    if (dash) return dash
+    return root.themeIconForClass(className)
   }
 
   implicitWidth: button.implicitWidth
@@ -563,21 +585,45 @@ Panel {
                       sourceSize.width: width * Screen.devicePixelRatio
                       sourceSize.height: height * Screen.devicePixelRatio
                       source: root.iconSourceForClass(modelData.className)
+                      property bool fellBack: false
+                      onStatusChanged: {
+                        if (status === Image.Error && !fellBack) {
+                          fellBack = true
+                          source = root.themeIconForClass(modelData.className)
+                        }
+                      }
                     }
 
-                    Text {
+                    Column {
                       anchors.left: appIcon.right
                       anchors.leftMargin: Style.space(10)
                       anchors.right: appSwitch.left
                       anchors.rightMargin: Style.space(10)
                       anchors.verticalCenter: parent.verticalCenter
-                      text: root.displayNameForClass(modelData.className)
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      elide: Text.ElideRight
-                      maximumLineCount: 1
-                      wrapMode: Text.NoWrap
+                      spacing: 0
+
+                      Text {
+                        width: parent.width
+                        text: root.displayNameForClass(modelData.className)
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        wrapMode: Text.NoWrap
+                      }
+
+                      Text {
+                        width: parent.width
+                        visible: root.instanceCount(modelData.className) > 1
+                        text: modelData.title || ""
+                        color: root.dimColor
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        wrapMode: Text.NoWrap
+                      }
                     }
 
                     ToggleSwitch {

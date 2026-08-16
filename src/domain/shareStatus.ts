@@ -31,15 +31,10 @@ export function shareStatus(snapshot: DesktopSnapshot, options: FollowOptions): 
     decision: decideFollow(snapshot, options),
     monitors: snapshot.monitors.map((monitor) => {
       const apps: AppStatus[] = []
-      const seen = new Set<string>()
       for (const window of snapshot.windows) {
         if (window.monitorId !== monitor.id || isSelfWindow(window, options)) {
           continue
         }
-        if (seen.has(window.className)) {
-          continue
-        }
-        seen.add(window.className)
         apps.push({
           className: window.className,
           title: window.title === '' ? window.className : window.title,

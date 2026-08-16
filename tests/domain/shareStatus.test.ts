@@ -70,7 +70,7 @@ describe('shareStatus', () => {
     ])
   })
 
-  it('lists a class once and uses the class when the title is empty', () => {
+  it('lists each window of the same app so the bar can show titles only when there are two', () => {
     const first = windowSnap({ address: '0xone', className: 'firefox', title: 'Mozilla Firefox' })
     const second = windowSnap({
       address: '0xtwo',
@@ -94,6 +94,7 @@ describe('shareStatus', () => {
     )
     expect(status.monitors[0]?.apps).toEqual([
       { className: 'firefox', title: 'Mozilla Firefox', enabled: true },
+      { className: 'firefox', title: 'another tab', enabled: true },
       { className: 'secret', title: 'secret', enabled: true },
     ])
   })
