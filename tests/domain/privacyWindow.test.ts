@@ -1,0 +1,73 @@
+import { describe, expect, it } from 'vitest'
+import { findPrivacyWindow, privacyRegionFrom } from '../../src/domain/privacyWindow.ts'
+import { monitor, windowSnap } from '../fixtures.ts'
+
+describe('privacy window lookup', () => {
+  it('finds the mapped Followcast Privacy surface', () => {
+    const card = windowSnap({
+      address: '0xcard',
+      className: 'followcast-privacy',
+      title: 'Followcast Privacy',
+      at: { x: 40, y: 50 },
+      size: { width: 640, height: 360 },
+    })
+    const fox = windowSnap({ address: '0xfox', className: 'firefox', title: 'Firefox' })
+    expect(findPrivacyWindow([fox, card])?.address).toBe('0xcard')
+    expect(
+      privacyRegionFrom({
+        focusedAddress: fox.address,
+        windows: [fox, card],
+        monitors: [monitor()],
+      }),
+    ).toEqual({ output: 'DP-1', x: 40, y: 50, width: 640, height: 360 })
+  })
+
+  it('returns null when the privacy surface is missing', () => {
+    const fox = windowSnap({ address: '0xfox', className: 'firefox', title: 'Firefox' })
+    expect(
+      privacyRegionFrom({ focusedAddress: fox.address, windows: [fox], monitors: [monitor()] }),
+    ).toBeNull()
+  })
+
+  it('returns null when the privacy surface has no matching monitor', () => {
+    const card = windowSnap({
+      address: '0xcard',
+      className: 'followcast-privacy',
+      title: 'Followcast Privacy',
+      monitorId: 9,
+    })
+    expect(
+      privacyRegionFrom({
+        focusedAddress: card.address,
+        windows: [card],
+        monitors: [monitor()],
+      }),
+    ).toBeNull()
+  })
+
+  it('ignores an unmapped privacy surface and finds one by title', () => {
+    const hidden = windowSnap({
+      address: '0xhidecard',
+      className: 'followcast-privacy',
+      title: 'Followcast Privacy',
+      mapped: false,
+    })
+    const titled = windowSnap({
+      address: '0xtitlecard',
+      className: 'python3',
+      title: 'Followcast Privacy',
+      at: { x: 8, y: 9 },
+      size: { width: 100, height: 80 },
+    })
+    expect(findPrivacyWindow([hidden, titled])?.address).toBe('0xtitlecard')
+  })
+
+  it('finds a privacy surface by class even when the title is different', () => {
+    const card = windowSnap({
+      address: '0xclasscard',
+      className: 'followcast-privacy',
+      title: 'Hidden surface',
+    })
+    expect(findPrivacyWindow([card])?.address).toBe('0xclasscard')
+  })
+})

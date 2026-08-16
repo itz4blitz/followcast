@@ -1,0 +1,13 @@
+node_modules/
+coverage/
+reports/
+.stryker-tmp/
+dist/
+.grok/
+tmp*
+*.log
+.env
+.env.*
+*.js
+*.mjs
+*.cjs

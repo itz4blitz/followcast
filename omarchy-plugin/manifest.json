@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "followcast",
+  "name": "Followcast",
+  "version": "1.0.0",
+  "author": "Followcast",
+  "description": "Mute monitors and apps in the Followcast privacy filter",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Followcast",
+    "description": "Share switchboard: monitors and applications",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

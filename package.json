@@ -1,0 +1,63 @@
+{
+  "name": "followcast",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Share one Followcast window. It always shows the Hyprland keyboard-focused app, even on another monitor.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itz4blitz/followcast.git"
+  },
+  "bugs": {
+    "url": "https://github.com/itz4blitz/followcast/issues"
+  },
+  "homepage": "https://github.com/itz4blitz/followcast#readme",
+  "bin": {
+    "followcast": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "omarchy-plugin",
+    "privacy-card.py",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --no-warn-ignored",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "knip": "knip --max-issues 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "mutation": "stryker run stryker.config.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "npm run build && node dist/cli.js",
+    "ci": "npm run typecheck && npm run lint && npm run format && npm run knip && npm test && npm run coverage && npm run mutation"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stryker-mutator/api": "^9.6.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "fast-check": "^4.3.0",
+    "knip": "^6.32.2",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
