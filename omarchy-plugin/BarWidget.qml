@@ -12,6 +12,7 @@ Panel {
   ipcTarget: "followcast"
 
   property bool ready: false
+  property bool sharing: false
   property string mode: "idle"
   property string hiddenApp: ""
   property var monitors: []
@@ -28,6 +29,16 @@ Panel {
     var home = String(Quickshell.env("HOME") || "")
     return home + "/.local/bin/followcast"
   }
+  readonly property string iconPath: {
+    var url = String(Qt.resolvedUrl("icon.png"))
+    return url.startsWith("file://") ? url : ("file://" + url)
+  }
+  readonly property string sharingPath: {
+    var url = String(Qt.resolvedUrl("sharing.py"))
+    return url.startsWith("file://") ? url.substring(7) : url
+  }
+  readonly property string statusLabel: root.mode === "hidden" ? "Hidden" : (root.mode === "live" ? "Live" : "Idle")
+  readonly property string shareLabel: root.sharing ? "Sharing" : "Not sharing"
 
   readonly property var selected: {
     for (var i = 0; i < monitors.length; i++)
@@ -70,6 +81,7 @@ Panel {
 
   function refresh() {
     if (!collectProc.running) collectProc.running = true
+    if (!shareProc.running) shareProc.running = true
   }
 
   function patchMonitor(name, enabled) {
@@ -156,6 +168,22 @@ Panel {
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.refresh() }
   }
 
+  Process {
+    id: shareProc
+    command: ["python3", root.sharingPath]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var d = JSON.parse(String(text))
+          root.sharing = d.sharing === true
+        } catch (e) {
+          root.sharing = false
+        }
+      }
+    }
+  }
+
   Timer {
     interval: 2000
     running: true
@@ -182,20 +210,49 @@ Panel {
       anchors.centerIn: parent
       spacing: Style.space(8)
 
+      Image {
+        width: Style.space(18)
+        height: Style.space(18)
+        anchors.verticalCenter: parent.verticalCenter
+        fillMode: Image.PreserveAspectFit
+        asynchronous: true
+        sourceSize.width: width * Screen.devicePixelRatio
+        sourceSize.height: height * Screen.devicePixelRatio
+        source: root.iconPath
+      }
+
       Text {
-        text: "cast"
-        color: root.ready ? root.dimColor : (root.bar ? root.bar.urgent : Color.urgent)
+        text: "Followcast"
+        color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
+        font.bold: true
         anchors.verticalCenter: parent.verticalCenter
       }
 
-      Rectangle {
-        width: 8
-        height: 8
-        radius: 4
+      Text {
+        text: root.statusLabel
+        color: root.mode === "hidden" ? root.hideColor : (root.mode === "live" ? root.okColor : root.dimColor)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
         anchors.verticalCenter: parent.verticalCenter
-        color: root.mode === "hidden" ? root.hideColor : (root.mode === "live" ? root.okColor : root.trackColor)
+      }
+
+      Text {
+        text: "·"
+        color: root.dimColor
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        text: root.shareLabel
+        color: root.sharing ? root.okColor : root.dimColor
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        anchors.verticalCenter: parent.verticalCenter
       }
     }
   }
@@ -220,9 +277,11 @@ Panel {
           width: parent.width
           title: "Followcast"
           detail: root.mode === "hidden" ? "Hidden" : (root.mode === "live" ? "Live" : "Idle")
-          meta: root.mode === "hidden"
-            ? ("Audience sees the privacy card" + (root.hiddenApp ? " · " + root.hiddenApp : ""))
-            : "Audience sees the focused allowed app"
+          meta: (root.sharing ? "Sharing now" : "Not sharing")
+            + " · "
+            + (root.mode === "hidden"
+              ? ("privacy card" + (root.hiddenApp ? " · " + root.hiddenApp : ""))
+              : "focused allowed app")
           foreground: root.foreground
           fontFamily: root.fontFamily
         }
