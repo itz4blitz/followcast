@@ -21,7 +21,10 @@ Panel {
   readonly property color hideColor: Qt.rgba(0.95, 0.62, 0.35, 1)
   readonly property color okColor: Qt.rgba(0.45, 0.82, 0.52, 1)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property string cli: "followcast"
+  readonly property string cli: {
+    var home = String(Quickshell.env("HOME") || "")
+    return home + "/.local/bin/followcast"
+  }
 
   readonly property var selected: {
     for (var i = 0; i < monitors.length; i++)

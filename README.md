@@ -88,9 +88,10 @@ On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/followcast`
 and add `followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
 calls `followcast status` / `followcast policy`.
 
-The privacy card is a hidden special-workspace window. You should not see
-**Hidden by Followcast** on your desktop. The audience sees it only when a
-muted app or monitor is focused.
+You should not see Followcast on your monitors. Both the dummy window and
+the privacy card live on a hidden special workspace. The audience sees
+them when you pick **Followcast** in the share picker. The bar chip is
+the only on-screen control.
 
 ## Policy
 
