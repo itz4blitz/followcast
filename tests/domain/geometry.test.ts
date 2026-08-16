@@ -1,7 +1,48 @@
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { windowToRegion } from '../../src/domain/geometry.ts'
+import { monitorToRegion, windowToRegion } from '../../src/domain/geometry.ts'
 import { monitor, windowSnap } from '../fixtures.ts'
+
+describe('monitorToRegion', () => {
+  it('covers the full logical monitor so the share includes chrome and gaps', () => {
+    expect(monitorToRegion(monitor())).toEqual({
+      output: 'DP-1',
+      x: 0,
+      y: 0,
+      width: 1600,
+      height: 900,
+    })
+  })
+
+  it('rounds fractional scale so slurp gets whole pixels', () => {
+    const dell = monitor({
+      name: 'DP-3',
+      x: 200,
+      y: 900,
+      width: 1920,
+      height: 1080,
+      scale: 1.3333334,
+    })
+    expect(monitorToRegion(dell)).toEqual({
+      output: 'DP-3',
+      x: 200,
+      y: 900,
+      width: 1440,
+      height: 810,
+    })
+  })
+
+  it('keeps the second display in global layout coordinates', () => {
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
+    expect(monitorToRegion(hdmi)).toEqual({
+      output: 'HDMI-A-1',
+      x: 1600,
+      y: 0,
+      width: 1600,
+      height: 900,
+    })
+  })
+})
 
 describe('windowToRegion', () => {
   it('converts a window on a scaled monitor into a slurp region', () => {

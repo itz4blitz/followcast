@@ -7,6 +7,17 @@ function logicalSize(monitor: MonitorSnapshot): { width: number; height: number 
   }
 }
 
+export function monitorToRegion(monitor: MonitorSnapshot): FollowRegion {
+  const box = logicalSize(monitor)
+  return {
+    output: monitor.name,
+    x: monitor.x,
+    y: monitor.y,
+    width: Math.round(box.width),
+    height: Math.round(box.height),
+  }
+}
+
 export function windowToRegion(
   window: WindowSnapshot,
   monitor: MonitorSnapshot,

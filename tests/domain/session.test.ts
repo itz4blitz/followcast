@@ -18,11 +18,11 @@ function desktop(overrides: Partial<DesktopSnapshot> = {}): DesktopSnapshot {
 describe('reduceSession', () => {
   it('emits a stream command on the first follow', () => {
     const step = reduceSession(empty, desktop(), options())
-    expect(step.command).toBe("--region '10,20 800x600 DP-1'")
+    expect(step.command).toBe("--region '0,0 1600x900 DP-1'")
     expect(step.state.last).toEqual({
       kind: 'follow',
       address: '0xfox',
-      region: { output: 'DP-1', x: 10, y: 20, width: 800, height: 600 },
+      region: { output: 'DP-1', x: 0, y: 0, width: 1600, height: 900 },
     })
   })
 
@@ -52,11 +52,11 @@ describe('reduceSession', () => {
       }),
       options(),
     )
-    expect(moved.command).toBe("--region '1700,80 200x100 HDMI-A-1'")
+    expect(moved.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
     expect(moved.state.last?.kind).toBe('follow')
   })
 
-  it('emits a new command when the same window is resized', () => {
+  it('does not retarget when the same window is resized on the same monitor', () => {
     const first = reduceSession(empty, desktop(), options())
     const resized = windowSnap({
       address: '0xfox',
@@ -65,7 +65,7 @@ describe('reduceSession', () => {
       size: { width: 400, height: 300 },
     })
     const step = reduceSession(first.state, desktop({ windows: [resized] }), options())
-    expect(step.command).toBe("--region '10,20 400x300 DP-1'")
+    expect(step.command).toBeNull()
   })
 
   it('emits nothing and keeps the last follow when the user focuses Followcast itself', () => {
@@ -191,7 +191,7 @@ describe('reduceSession', () => {
   it('emits a follow after a hold once a real window is focused', () => {
     const held = reduceSession(empty, desktop({ focusedAddress: null }), options())
     const followed = reduceSession(held.state, desktop(), options())
-    expect(followed.command).toBe("--region '10,20 800x600 DP-1'")
+    expect(followed.command).toBe("--region '0,0 1600x900 DP-1'")
   })
 
   it('plays a monitor slide before following an app on another display', () => {
@@ -248,7 +248,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       460,
     )
-    expect(landed.command).toBe("--region '1700,80 200x100 HDMI-A-1'")
+    expect(landed.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
     expect(landed.state.last?.kind).toBe('follow')
     expect(landed.state.pendingFollow).toBeNull()
   })
@@ -348,7 +348,7 @@ describe('reduceSession', () => {
     expect(toDell.state.pendingFollow).toMatchObject({ address: '0xmail' })
   })
 
-  it('updates the pending window when focus stays on the destination monitor during the slide', () => {
+  it('keeps the slide when focus stays on the destination monitor during the slide', () => {
     const slot = { output: 'DP-1', x: 1, y: 2, width: 480, height: 270 }
     const first = reduceSession(empty, desktop(), options({ privacyRegion: slot }), 0)
     const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
@@ -387,7 +387,43 @@ describe('reduceSession', () => {
       80,
     )
     expect(swapped.command).toBeNull()
-    expect(swapped.state.last?.kind).toBe('transition')
-    expect(swapped.state.pendingFollow).toMatchObject({ address: '0xother' })
+    expect(swapped.state).toBe(moved.state)
+  })
+
+  it('updates the pending follow when the destination monitor moves during the slide', () => {
+    const slot = { output: 'DP-1', x: 1, y: 2, width: 480, height: 270 }
+    const first = reduceSession(empty, desktop(), options({ privacyRegion: slot }), 0)
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
+    const code = windowSnap({
+      address: '0xcode',
+      className: 'Code',
+      monitorId: 1,
+      at: { x: 1700, y: 80 },
+      size: { width: 200, height: 100 },
+    })
+    const moved = reduceSession(
+      first.state,
+      desktop({
+        focusedAddress: code.address,
+        windows: [code],
+        monitors: [monitor(), hdmi],
+      }),
+      options({ privacyRegion: slot }),
+      10,
+    )
+    const shifted = monitor({ id: 1, name: 'HDMI-A-1', x: 1800, y: 0 })
+    const updated = reduceSession(
+      moved.state,
+      desktop({
+        focusedAddress: code.address,
+        windows: [code],
+        monitors: [monitor(), shifted],
+      }),
+      options({ privacyRegion: slot }),
+      80,
+    )
+    expect(updated.command).toBeNull()
+    expect(updated.state.last?.kind).toBe('transition')
+    expect(updated.state.pendingFollow?.region).toMatchObject({ output: 'HDMI-A-1', x: 1800 })
   })
 })

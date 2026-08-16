@@ -19,7 +19,7 @@ describe('decideFollow', () => {
     expect(decideFollow(snapshot, options())).toEqual({
       kind: 'follow',
       address: '0xfox',
-      region: { output: 'DP-1', x: 10, y: 20, width: 800, height: 600 },
+      region: { output: 'DP-1', x: 0, y: 0, width: 1600, height: 900 },
     })
   })
 
@@ -87,7 +87,7 @@ describe('decideFollow', () => {
     ).toEqual({
       kind: 'follow',
       address: '0xterm',
-      region: { output: 'DP-1', x: 10, y: 20, width: 800, height: 600 },
+      region: { output: 'DP-1', x: 0, y: 0, width: 1600, height: 900 },
     })
   })
 
@@ -216,7 +216,7 @@ describe('decideFollow', () => {
     ).toEqual({
       kind: 'follow',
       address: '0xcode',
-      region: { output: 'HDMI-A-1', x: 1700, y: 80, width: 200, height: 100 },
+      region: { output: 'HDMI-A-1', x: 1600, y: 0, width: 1600, height: 900 },
     })
   })
 })

@@ -1,8 +1,8 @@
 # Followcast
 
 Share **one** window in Meet, Zoom, or Discord. Followcast always shows the
-Hyprland app that has keyboard focus, including when that app is on another
-monitor.
+**full display** that has keyboard focus, including the bar and window chrome,
+and follows when that focus moves to another monitor.
 
 The portal cannot retarget a live share. Followcast is the dummy window you pick
 once. A daemon retargets [`wl-mirror`](https://github.com/Ferdi265/wl-mirror)

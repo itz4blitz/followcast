@@ -196,7 +196,7 @@ describe('buildCliMain', () => {
       signal: controller.signal,
     })
     await waitUntil(() => sent.length > 0)
-    expect(sent).toEqual(["--region '0,0 100x100 DP-1'"])
+    expect(sent).toEqual(["--region '0,0 1920x1080 DP-1'"])
     expect(published).toEqual([null])
     stored = { monitors: {}, apps: { firefox: false } }
     ticks.push(undefined)

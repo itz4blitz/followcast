@@ -141,7 +141,7 @@ describe('runFollowcast', () => {
     const handle = startFollowcast(portsOf(w), options(), controller.signal)
     await handle.ready
     expect(w.started).toEqual(['DP-1'])
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
     await shutdown(controller, w, handle.finished)
     expect(w.stops).toBe(1)
   })
@@ -156,13 +156,13 @@ describe('runFollowcast', () => {
     w.events.push('activewindowv2>>0xcode')
     await waitUntil(() => w.sent.length === 2)
     expect(w.sent).toEqual([
-      "--region '10,20 800x600 DP-1'",
+      "--region '0,0 2560x1440 DP-1'",
       "--region '4624,1154 480x270 HDMI-A-1'",
     ])
     w.now = 500
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '2600,40 400x300 HDMI-A-1'")
+    expect(w.sent[2]).toBe("--region '2560,0 2560x1440 HDMI-A-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -178,7 +178,7 @@ describe('runFollowcast', () => {
     await new Promise<void>((resolve) => {
       setImmediate(resolve)
     })
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -205,14 +205,15 @@ describe('runFollowcast', () => {
     await shutdown(controller, w, handle.finished)
   })
 
-  it('re-reads geometry on a clock tick so a resize follows without a Hyprland resize event', async () => {
+  it('does not retarget on a tick when the window is only resized on the same monitor', async () => {
     const w = world()
     const controller = new AbortController()
     const handle = startFollowcast(portsOf(w), options(), controller.signal)
     await handle.ready
     w.clients = [{ ...fox, size: [200, 100] }]
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.at(-1) === "--region '10,20 200x100 DP-1'")
+    await waitUntil(() => w.sent.length >= 1)
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -247,7 +248,7 @@ describe('runFollowcast', () => {
     w.now = 1000
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length === 5)
-    expect(w.sent[4]).toBe("--region '10,20 800x600 DP-1'")
+    expect(w.sent[4]).toBe("--region '0,0 2560x1440 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -280,7 +281,7 @@ describe('runFollowcast', () => {
     w.now = 1000
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length === 5)
-    expect(w.sent[4]).toBe("--region '10,20 800x600 DP-1'")
+    expect(w.sent[4]).toBe("--region '0,0 2560x1440 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -302,7 +303,7 @@ describe('runFollowcast', () => {
     w.events.close()
     w.ticks.close()
     await handle.finished
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
   })
 
   it('does not apply a refresh that started after abort', async () => {
@@ -345,7 +346,7 @@ describe('runFollowcast', () => {
     w.events.close()
     w.ticks.close()
     await handle.finished
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
   })
 
   it('publishes the privacy card when the focused app is toggled off', async () => {
@@ -412,7 +413,7 @@ describe('runFollowcast', () => {
     })
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.at(-1) === "--region '2600,40 400x300 HDMI-A-1'")
+    await waitUntil(() => w.sent.at(-1) === "--region '2560,0 2560x1440 HDMI-A-1'")
     expect(published.at(-1)).toBeNull()
     await shutdown(controller, w, handle.finished)
   })
@@ -432,7 +433,7 @@ describe('runFollowcast', () => {
     const handle = startFollowcast(ports, options(), controller.signal)
     await handle.ready
     expect(published).toEqual([null])
-    expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
