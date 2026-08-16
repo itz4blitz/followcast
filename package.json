@@ -18,7 +18,6 @@
   },
   "files": [
     "dist",
-    "docs",
     "omarchy-plugin",
     "privacy-card.py",
     "LICENSE",

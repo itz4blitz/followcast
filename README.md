@@ -51,7 +51,14 @@ o.window({ title = "^Followcast Privacy$" }, {
 
 Then `hyprctl reload`.
 
-Start it when you want to share (do not leave it running otherwise):
+Run it at login so the **Followcast** window is already in the share picker:
+
+```lua
+-- ~/.config/hypr/autostart.lua
+o.launch_on_start("followcast")
+```
+
+Or start it by hand:
 
 ```bash
 followcast
@@ -65,7 +72,7 @@ followcast --deny-class zoom --deny-class skype
 
 ## Use
 
-1. Start Followcast. A window titled **Followcast** appears.
+1. A window titled **Followcast** is already running after login.
 2. In the share picker, open **Windows** and pick **Followcast**.
 3. Change focus as usual. The share follows the focused app only if that
    monitor and app are on in the policy.
@@ -101,8 +108,6 @@ npm run coverage
 npm run mutation
 npm run ci
 ```
-
-Design: `docs/superpowers/specs/2026-08-16-followcast-design.md`
 
 ## License
 

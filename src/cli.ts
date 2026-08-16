@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createConnection } from 'node:net'
