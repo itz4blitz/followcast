@@ -88,13 +88,16 @@ Panel {
     onTriggered: root.refresh()
   }
 
-  MouseArea {
+  WidgetButton {
     id: button
-    implicitWidth: chip.implicitWidth + Style.space(12)
-    implicitHeight: Style.barButtonHeight
-    hoverEnabled: true
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
-    onClicked: function(mouse) { root.triggerPress(mouse.button) }
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    pressable: true
+    horizontalMargin: 8
+    fixedWidth: chip.implicitWidth + scaledHorizontalMargin * 2
+    onPressed: function(b) { root.triggerPress(b) }
 
     Row {
       id: chip
@@ -176,9 +179,8 @@ Panel {
                   width: monCol.width
                   text: (modelData.enabled ? "On  " : "Off ") + modelData.name
                   foreground: root.foreground
-                  checked: root.selected && root.selected.name === modelData.name
+                  selected: root.selected && root.selected.name === modelData.name
                   onClicked: root.selectedMonitor = modelData.name
-                  onPressAndHold: root.setMonitor(modelData.name, !modelData.enabled)
                 }
               }
             }

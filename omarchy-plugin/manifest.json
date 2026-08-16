@@ -13,7 +13,7 @@
     "displayName": "Followcast",
     "description": "Share switchboard: monitors and applications",
     "category": "System",
-    "allowMultiple": false,
+    "allowMultiple": true,
     "defaultSection": "right"
   }
 }
