@@ -16,6 +16,7 @@ Panel {
   property string mode: "idle"
   property string hiddenApp: ""
   property var monitors: []
+  property var catalog: ({})
   property string selectedMonitor: ""
   property string filterText: ""
 
@@ -37,6 +38,10 @@ Panel {
     var url = String(Qt.resolvedUrl("sharing.py"))
     return url.startsWith("file://") ? url.substring(7) : url
   }
+  readonly property string appsPath: {
+    var url = String(Qt.resolvedUrl("apps.py"))
+    return url.startsWith("file://") ? url.substring(7) : url
+  }
   readonly property string statusLabel: root.mode === "hidden" ? "Hidden" : (root.mode === "live" ? "Live" : "Idle")
   readonly property string shareLabel: root.sharing ? "Sharing" : "Not sharing"
 
@@ -54,9 +59,9 @@ Panel {
     var list = []
     for (var i = 0; i < apps.length; i++) {
       var app = apps[i]
-      var title = String(app.title || "").toLowerCase()
+      var name = String(root.displayNameForClass(app.className) || "").toLowerCase()
       var cls = String(app.className || "").toLowerCase()
-      if (title.indexOf(q) >= 0 || cls.indexOf(q) >= 0) list.push(app)
+      if (name.indexOf(q) >= 0 || cls.indexOf(q) >= 0) list.push(app)
     }
     return list
   }
@@ -82,6 +87,8 @@ Panel {
   function refresh() {
     if (!collectProc.running) collectProc.running = true
     if (!shareProc.running) shareProc.running = true
+    if (!appsProc.running && Object.keys(root.catalog).length === 0)
+      appsProc.running = true
   }
 
   function patchMonitor(name, enabled) {
@@ -131,16 +138,72 @@ Panel {
     root.toggle()
   }
 
+  function classKeys(className) {
+    var cls = String(className || "")
+    var lower = cls.toLowerCase()
+    var keys = [lower]
+    var last = lower.split(".").pop()
+    if (last && keys.indexOf(last) < 0) keys.push(last)
+    var dash = lower.indexOf("-")
+    var host = ""
+    if (dash > 0) {
+      var rest = lower.slice(dash + 1)
+      var cut = rest.indexOf("__")
+      host = cut >= 0 ? rest.slice(0, cut) : rest
+      if (host && keys.indexOf(host) < 0) keys.push(host)
+      var label = host.split(".")[0]
+      if (label && keys.indexOf(label) < 0) keys.push(label)
+    }
+    if (lower.indexOf("discord") >= 0 && keys.indexOf("discord") < 0) keys.push("discord")
+    return keys
+  }
+
+  function catalogHit(className) {
+    var keys = root.classKeys(className)
+    for (var i = 0; i < keys.length; i++) {
+      var hit = root.catalog[keys[i]]
+      if (hit && hit.name) return hit
+    }
+    return null
+  }
+
+  function prettyClassName(className) {
+    var raw = String(className || "")
+    if (!raw) return "App"
+    var last = raw.split(".").pop()
+    var dash = last.indexOf("-")
+    if (dash > 0 && last.indexOf(".") < 0) last = last.slice(0, dash)
+    last = last.replace(/[_-]+/g, " ")
+    if (!last) return "App"
+    return last.charAt(0).toUpperCase() + last.slice(1)
+  }
+
+  function displayNameForClass(className) {
+    var hit = root.catalogHit(className)
+    if (hit) return hit.name
+    var lower = String(className || "").toLowerCase()
+    if (lower.indexOf("discord") >= 0) return "Discord"
+    if (lower.indexOf("spotify") >= 0) return "Spotify"
+    if (lower.indexOf("thunderbird") >= 0) return "Thunderbird"
+    if (lower.indexOf("telegram") >= 0) return "Telegram"
+    if (lower.indexOf("1password") >= 0) return "1Password"
+    if (lower === "zcode") return "ZCode"
+    if (lower.indexOf("brave") >= 0) return "Brave"
+    return root.prettyClassName(className)
+  }
+
   function iconNameForClass(className) {
+    var hit = root.catalogHit(className)
+    if (hit && hit.icon) return hit.icon
     var cls = String(className || "")
     var lower = cls.toLowerCase()
     if (lower.indexOf("discord") >= 0) return "discord"
-    if (lower.indexOf("spotify") >= 0) return "spotify"
-    if (lower.indexOf("thunderbird") >= 0) return "thunderbird"
+    if (lower.indexOf("spotify") >= 0) return "spotify-client"
+    if (lower.indexOf("thunderbird") >= 0) return "org.mozilla.Thunderbird"
     if (lower.indexOf("telegram") >= 0) return "org.telegram.desktop"
     if (lower.indexOf("1password") >= 0) return "1password"
     if (lower === "zcode") return "code"
-    if (lower.indexOf("brave") >= 0) return "brave-browser"
+    if (lower.indexOf("brave") >= 0) return "brave-desktop"
     var parts = cls.split(".")
     return parts[parts.length - 1] || cls
   }
@@ -169,6 +232,22 @@ Panel {
   }
 
   Process {
+    id: appsProc
+    command: ["python3", root.appsPath]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var d = JSON.parse(String(text))
+          root.catalog = d.apps && typeof d.apps === "object" ? d.apps : ({})
+        } catch (e) {
+          root.catalog = ({})
+        }
+      }
+    }
+  }
+
+  Process {
     id: shareProc
     command: ["python3", root.sharingPath]
     stdout: StdioCollector {
@@ -193,6 +272,7 @@ Panel {
   }
 
   onOpenedChanged: if (!root.opened) root.filterText = ""
+  Component.onCompleted: appsProc.running = true
 
   WidgetButton {
     id: button
@@ -491,7 +571,7 @@ Panel {
                       anchors.right: appSwitch.left
                       anchors.rightMargin: Style.space(10)
                       anchors.verticalCenter: parent.verticalCenter
-                      text: modelData.title || modelData.className
+                      text: root.displayNameForClass(modelData.className)
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.body
