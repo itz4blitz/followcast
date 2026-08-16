@@ -340,6 +340,7 @@ describe('runFollowcast', () => {
     )
     await handle.ready
     expect(published).toEqual([{ appLabel: 'Mozilla Firefox' }])
+    expect(w.sent).toEqual(["--region '4624,1154 480x270 HDMI-A-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -353,12 +354,12 @@ describe('runFollowcast', () => {
     )
     await handle.ready
     expect(w.started).toEqual(['DP-1'])
-    expect(w.sent).toEqual([])
+    expect(w.sent).toEqual(["--region '4624,1154 480x270 HDMI-A-1'"])
     await shutdown(controller, w, handle.finished)
     expect(w.stops).toBe(1)
   })
 
-  it('does not publish a privacy card while sharing an allowed app', async () => {
+  it('clears the privacy card while sharing an allowed app', async () => {
     const w = world()
     const published: Array<{ appLabel: string } | null> = []
     const controller = new AbortController()
@@ -372,7 +373,7 @@ describe('runFollowcast', () => {
     }
     const handle = startFollowcast(ports, options(), controller.signal)
     await handle.ready
-    expect(published).toEqual([])
+    expect(published).toEqual([null])
     expect(w.sent).toEqual(["--region '10,20 800x600 DP-1'"])
     await shutdown(controller, w, handle.finished)
   })

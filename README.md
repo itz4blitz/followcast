@@ -14,7 +14,7 @@ card instead of the real window.
 ## Install
 
 ```bash
-pacman -S wl-mirror python-gobject gtk4
+pacman -S wl-mirror python-gobject gtk4 gtk4-layer-shell
 git clone https://github.com/itz4blitz/followcast.git
 cd followcast
 npm install
@@ -29,25 +29,22 @@ Add to `~/.config/hypr/hyprland.lua`:
 ```lua
 hl.permission({ binary = "/usr/bin/wl-mirror", type = "screencopy", mode = "allow" })
 
-o.window({ title = "^Followcast$" }, {
-  float = true,
-  no_initial_focus = true,
-  no_focus = true,
-  no_follow_mouse = true,
-  size = { 1280, 720 },
-})
-
--- Keep the privacy card off the desktop. wl-mirror still crops it.
-o.window({ title = "^Followcast Privacy$" }, {
+-- One shareable window. Hidden on a special workspace so it is not a
+-- picture-in-picture on your monitors. render_unfocused keeps the
+-- picker preview live.
+o.window({ class = "^at\\.yrlf\\.wl_mirror$", title = "^Followcast$" }, {
   float = true,
   workspace = "special:followcast silent",
-  no_focus = true,
   no_initial_focus = true,
+  no_focus = true,
   no_follow_mouse = true,
   render_unfocused = true,
-  size = { 1280, 720 },
+  size = { 480, 270 },
 })
 ```
+
+Do **not** add a window rule for a Followcast Privacy app. The blocked
+card is a layer-shell overlay, not a shareable window.
 
 Then `hyprctl reload`.
 
@@ -73,9 +70,11 @@ followcast --deny-class zoom --deny-class skype
 ## Use
 
 1. A window titled **Followcast** is already running after login.
-2. In the share picker, open **Windows** and pick **Followcast**.
+2. In the share picker, open **Windows** and pick **Followcast**. There
+   is only that one Followcast entry.
 3. Change focus as usual. The share follows the focused app only if that
-   monitor and app are on in the policy.
+   monitor and app are on in the policy. When an app is muted, the same
+   window shows the **Hidden by Followcast** card.
 4. Mute a monitor or app:
 
 ```bash
@@ -84,14 +83,14 @@ followcast policy set-app slack off
 followcast status
 ```
 
-On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/followcast`
-and add `followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
+On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/blitz.followcast`
+and add `blitz.followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
 calls `followcast status` / `followcast policy`.
 
-You should not see Followcast on your monitors. Both the dummy window and
-the privacy card live on a hidden special workspace. The audience sees
-them when you pick **Followcast** in the share picker. The bar chip is
-the only on-screen control.
+You should not see the Followcast dummy on your monitors. It lives on a
+hidden special workspace. The share picker and the people on the call see
+it. When something is muted, a small **Hidden by Followcast** card is
+composited so the dummy has pixels to show; the bar chip is the control.
 
 ## Policy
 

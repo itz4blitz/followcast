@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { filePrivacyCard } from './cli/cardPublisher.ts'
+import { withLayerShellPreload } from './cli/privacyCardProcess.ts'
 import { buildCliMain } from './cli/cliMain.ts'
 import { diskPolicy } from './cli/diskPolicy.ts'
 import { toDesktopSnapshot } from './hyprland/parse.ts'
@@ -48,7 +49,11 @@ const code = await buildCliMain({
       await hyprland.activeWindow(),
     ),
   createPorts: () => {
-    spawn('python3', [cardScript], { stdio: 'ignore', detached: true }).unref()
+    spawn('python3', [cardScript], {
+      stdio: 'ignore',
+      detached: true,
+      env: withLayerShellPreload(process.env),
+    }).unref()
     const ports = createRuntimePorts(
       process.env,
       runtimeDepsFromIo(

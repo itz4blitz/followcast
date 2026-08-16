@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { findPrivacyWindow, privacyRegionFrom } from '../../src/domain/privacyWindow.ts'
+import {
+  findPrivacyWindow,
+  privacyRegionFrom,
+  privacySlotRegion,
+} from '../../src/domain/privacyWindow.ts'
 import { monitor, windowSnap } from '../fixtures.ts'
 
 describe('privacy window lookup', () => {
@@ -69,5 +73,22 @@ describe('privacy window lookup', () => {
       title: 'Hidden surface',
     })
     expect(findPrivacyWindow([card])?.address).toBe('0xclasscard')
+  })
+})
+
+describe('privacySlotRegion', () => {
+  it('reserves a bottom-right slot on the last monitor', () => {
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0, focused: false })
+    expect(privacySlotRegion([monitor(), hdmi])).toEqual({
+      output: 'HDMI-A-1',
+      x: 1600 + 1600 - 480 - 16,
+      y: 0 + 900 - 270 - 16,
+      width: 480,
+      height: 270,
+    })
+  })
+
+  it('returns null when there are no monitors', () => {
+    expect(privacySlotRegion([])).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
 import { initialOutput } from '../domain/initialOutput.ts'
-import { privacyRegionFrom } from '../domain/privacyWindow.ts'
+import { privacyRegionFrom, privacySlotRegion } from '../domain/privacyWindow.ts'
 import { reduceSession } from '../domain/session.ts'
 import type { FollowOptions, SessionState } from '../domain/types.ts'
 import { classifyEvent } from '../hyprland/events.ts'
@@ -97,7 +97,7 @@ function apply(
 ): SessionState {
   const step = reduceSession(state, snapshot, {
     ...options,
-    privacyRegion: privacyRegionFrom(snapshot),
+    privacyRegion: privacyRegionFrom(snapshot) ?? privacySlotRegion(snapshot.monitors),
   })
   if (step.command !== null) {
     ports.mirror.send(step.command)
@@ -108,6 +108,8 @@ function apply(
     // Stryker disable next-line ConditionalExpression: equivalent — reduceSession always leaves last set
     if (last !== null && last.kind === 'privacy') {
       card.publish({ appLabel: last.appLabel })
+    } else {
+      card.publish(null)
     }
   }
   return step.state

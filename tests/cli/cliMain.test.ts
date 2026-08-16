@@ -197,10 +197,11 @@ describe('buildCliMain', () => {
     })
     await waitUntil(() => sent.length > 0)
     expect(sent).toEqual(["--region '0,0 100x100 DP-1'"])
+    expect(published).toEqual([null])
     stored = { monitors: {}, apps: { firefox: false } }
     ticks.push(undefined)
-    await waitUntil(() => published.length > 0)
-    expect(published).toEqual([{ appLabel: 'Mozilla Firefox' }])
+    await waitUntil(() => published.some((item) => item?.appLabel === 'Mozilla Firefox'))
+    expect(published).toEqual([null, { appLabel: 'Mozilla Firefox' }])
     expect(sent.at(-1)).toBe("--region '40,50 640x360 DP-1'")
     controller.abort()
     events.close()

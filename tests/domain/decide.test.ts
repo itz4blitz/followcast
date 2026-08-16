@@ -76,15 +76,19 @@ describe('decideFollow', () => {
     ).toEqual({ kind: 'hold', reason: 'self' })
   })
 
-  it('holds when the focused window title contains Followcast', () => {
-    const self = windowSnap({
-      address: '0xself',
-      className: 'something-else',
-      title: 'Followcast — DP-1',
+  it('follows a regular app whose title only mentions Followcast', () => {
+    const term = windowSnap({
+      address: '0xterm',
+      className: 'foot',
+      title: 'grok — Hyprland Followcast picker',
     })
     expect(
-      decideFollow(desktop({ focusedAddress: self.address, windows: [self] }), options()),
-    ).toEqual({ kind: 'hold', reason: 'self' })
+      decideFollow(desktop({ focusedAddress: term.address, windows: [term] }), options()),
+    ).toEqual({
+      kind: 'follow',
+      address: '0xterm',
+      region: { output: 'DP-1', x: 10, y: 20, width: 800, height: 600 },
+    })
   })
 
   it('shows the privacy card when the focused class is on the deny list', () => {

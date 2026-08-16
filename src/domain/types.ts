@@ -48,7 +48,7 @@ export type FollowOptions = {
 
 export const DEFAULT_FOLLOW_OPTIONS: FollowOptions = {
   selfClasses: ['at.yrlf.wl_mirror', 'followcast-privacy', 'followcast.privacy'],
-  selfTitleIncludes: ['Followcast'],
+  selfTitleIncludes: [],
   denyClasses: [],
   policy: DEFAULT_POLICY,
   privacyRegion: null,

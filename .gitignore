@@ -6,6 +6,8 @@ dist/
 .grok/
 tmp*
 *.log
+__pycache__/
+*.pyc
 .env
 .env.*
 *.js
