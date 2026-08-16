@@ -5,8 +5,9 @@ Share **one** window in Meet, Zoom, or Discord. Followcast always shows the
 and follows when that focus moves to another monitor.
 
 The portal cannot retarget a live share. Followcast is the dummy window you pick
-once. A daemon retargets [`wl-mirror`](https://github.com/Ferdi265/wl-mirror)
-to the focused window's slurp region.
+once. A daemon paints that window with the focused display (and a short
+Display N slide when you change screens). You should not see that dummy
+or the slide on your monitors.
 
 Muted monitors or apps show the audience a branded **Hidden by Followcast**
 card instead of the real window.

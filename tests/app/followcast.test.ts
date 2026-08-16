@@ -154,15 +154,15 @@ describe('runFollowcast', () => {
     w.clients = [fox, code]
     w.active = { address: '0xcode' }
     w.events.push('activewindowv2>>0xcode')
-    await waitUntil(() => w.sent.length === 2)
-    expect(w.sent).toEqual([
-      "--region '0,0 2560x1440 DP-1'",
-      "--region '4624,1154 480x270 HDMI-A-1'",
-    ])
+    await waitUntil(() => w.clients.length === 2)
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '2560,0 2560x1440 HDMI-A-1'")
+    await waitUntil(() => w.sent.length === 2)
+    expect(w.sent[1]).toBe("--region '2560,0 2560x1440 HDMI-A-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -230,25 +230,35 @@ describe('runFollowcast', () => {
 
   it('emits again when focus returns to the first app after visiting another', async () => {
     const w = world()
+    const published: Array<{ kind?: string; appLabel?: string } | null> = []
     const controller = new AbortController()
-    const handle = startFollowcast(portsOf(w), options(), controller.signal)
+    const handle = startFollowcast(
+      {
+        ...portsOf(w),
+        privacyCard: {
+          publish: (card) => {
+            published.push(card)
+          },
+        },
+      },
+      options(),
+      controller.signal,
+    )
     await handle.ready
     w.clients = [fox, code]
     w.active = { address: '0xcode' }
     w.events.push('activewindowv2>>0xcode')
-    await waitUntil(() => w.sent.length === 2)
+    await waitUntil(() => published.some((item) => item?.kind === 'slide'))
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 3)
-    w.now = 500
+    await waitUntil(() => w.sent.length === 2)
     w.active = { address: '0xfox' }
     w.events.push('activewindowv2>>0xfox')
-    await waitUntil(() => w.sent.length === 4)
-    expect(w.sent[3]).toBe("--region '4624,1154 480x270 HDMI-A-1'")
+    await waitUntil(() => published.filter((item) => item?.kind === 'slide').length >= 2)
     w.now = 1000
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 5)
-    expect(w.sent[4]).toBe("--region '0,0 2560x1440 DP-1'")
+    await waitUntil(() => w.sent.length === 3)
+    expect(w.sent[2]).toBe("--region '0,0 2560x1440 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -264,24 +274,35 @@ describe('runFollowcast', () => {
 
   it('retargets on ticks when focus moves away and back', async () => {
     const w = world()
+    const published: Array<{ kind?: string; appLabel?: string } | null> = []
     const controller = new AbortController()
-    const handle = startFollowcast(portsOf(w), options(), controller.signal)
+    const handle = startFollowcast(
+      {
+        ...portsOf(w),
+        privacyCard: {
+          publish: (card) => {
+            published.push(card)
+          },
+        },
+      },
+      options(),
+      controller.signal,
+    )
     await handle.ready
     w.clients = [fox, code]
     w.active = { address: '0xcode' }
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 2)
+    await waitUntil(() => published.some((item) => item?.kind === 'slide'))
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 3)
+    await waitUntil(() => w.sent.length === 2)
     w.active = { address: '0xfox' }
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 4)
-    expect(w.sent[3]).toBe("--region '4624,1154 480x270 HDMI-A-1'")
+    await waitUntil(() => published.filter((item) => item?.kind === 'slide').length >= 2)
     w.now = 1000
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 5)
-    expect(w.sent[4]).toBe("--region '0,0 2560x1440 DP-1'")
+    await waitUntil(() => w.sent.length === 3)
+    expect(w.sent[2]).toBe("--region '0,0 2560x1440 DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 

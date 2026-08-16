@@ -80,17 +80,13 @@ export function reduceSession(
       follow,
       snapshot.monitors,
     )
-    if (
-      slide !== null &&
-      options.privacyRegion !== null &&
-      slide.toOutput !== state.last.toOutput
-    ) {
+    if (slide !== null && slide.toOutput !== state.last.toOutput) {
       return {
         state: {
           last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },
           pendingFollow: follow,
         },
-        command: streamCommand(options.privacyRegion),
+        command: null,
       }
     }
     return { state: { last: state.last, pendingFollow: follow }, command: null }
@@ -104,17 +100,13 @@ export function reduceSession(
   const previousFollow =
     state.last !== null && state.last.kind === 'follow' ? state.last : state.pendingFollow
   const slide = monitorSlide(previousFollow, follow, snapshot.monitors)
-  if (
-    slide !== null &&
-    options.privacyRegion !== null &&
-    (state.last === null || state.last.kind !== 'transition')
-  ) {
+  if (slide !== null && (state.last === null || state.last.kind !== 'transition')) {
     return {
       state: {
         last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },
         pendingFollow: follow,
       },
-      command: streamCommand(options.privacyRegion),
+      command: null,
     }
   }
   return { state: withLast(follow), command: streamCommand(follow.region) }

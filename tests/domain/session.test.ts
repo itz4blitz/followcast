@@ -52,8 +52,20 @@ describe('reduceSession', () => {
       }),
       options(),
     )
-    expect(moved.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
-    expect(moved.state.last?.kind).toBe('follow')
+    expect(moved.command).toBeNull()
+    expect(moved.state.last?.kind).toBe('transition')
+    const landed = reduceSession(
+      moved.state,
+      desktop({
+        focusedAddress: code.address,
+        windows: [code],
+        monitors: [monitor(), hdmi],
+      }),
+      options(),
+      500,
+    )
+    expect(landed.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
+    expect(landed.state.last?.kind).toBe('follow')
   })
 
   it('does not retarget when the same window is resized on the same monitor', () => {
@@ -215,7 +227,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       10,
     )
-    expect(moved.command).toBe("--region '1,2 480x270 DP-1'")
+    expect(moved.command).toBeNull()
     expect(moved.state.last).toMatchObject({
       kind: 'transition',
       direction: 'right',
@@ -338,7 +350,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       80,
     )
-    expect(toDell.command).toBe("--region '1,2 480x270 DP-1'")
+    expect(toDell.command).toBeNull()
     expect(toDell.state.last).toMatchObject({
       kind: 'transition',
       fromOutput: 'DP-1',

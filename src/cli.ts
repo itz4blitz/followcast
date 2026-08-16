@@ -6,7 +6,6 @@ import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { filePrivacyCard } from './cli/cardPublisher.ts'
-import { withLayerShellPreload } from './cli/privacyCardProcess.ts'
 import { buildCliMain } from './cli/cliMain.ts'
 import { diskPolicy } from './cli/diskPolicy.ts'
 import { toDesktopSnapshot } from './hyprland/parse.ts'
@@ -49,11 +48,6 @@ const code = await buildCliMain({
       await hyprland.activeWindow(),
     ),
   createPorts: () => {
-    spawn('python3', [cardScript], {
-      stdio: 'ignore',
-      detached: true,
-      env: withLayerShellPreload(process.env),
-    }).unref()
     const ports = createRuntimePorts(
       process.env,
       runtimeDepsFromIo(
@@ -64,10 +58,14 @@ const code = await buildCliMain({
             })
           },
           spawn: (command, args) => {
-            const child = spawn(command, [...args], { stdio: ['pipe', 'ignore', 'inherit'] })
+            const argv =
+              command === 'wl-mirror' ? (['python3', cardScript] as const) : ([command, ...args] as const)
+            const child = spawn(argv[0], [...argv.slice(1)], {
+              stdio: ['pipe', 'ignore', 'inherit'],
+            })
             const stdin = child.stdin
             if (stdin === null) {
-              throw new Error('wl-mirror stdin is not available')
+              throw new Error('Followcast surface stdin is not available')
             }
             return {
               stdin,
