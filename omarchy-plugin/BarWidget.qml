@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -116,6 +117,29 @@ Panel {
 
   function triggerPress(button) {
     root.toggle()
+  }
+
+  function iconNameForClass(className) {
+    var cls = String(className || "")
+    var lower = cls.toLowerCase()
+    if (lower.indexOf("discord") >= 0) return "discord"
+    if (lower.indexOf("spotify") >= 0) return "spotify"
+    if (lower.indexOf("thunderbird") >= 0) return "thunderbird"
+    if (lower.indexOf("telegram") >= 0) return "org.telegram.desktop"
+    if (lower.indexOf("1password") >= 0) return "1password"
+    if (lower === "zcode") return "code"
+    if (lower.indexOf("brave") >= 0) return "brave-browser"
+    var parts = cls.split(".")
+    return parts[parts.length - 1] || cls
+  }
+
+  function iconSourceForClass(className) {
+    var name = root.iconNameForClass(className)
+    var themed = Quickshell.iconPath(name, true)
+    if (themed && themed.length > 0) return themed
+    var raw = Quickshell.iconPath(String(className || ""), true)
+    if (raw && raw.length > 0) return raw
+    return Quickshell.iconPath("application-x-executable", true)
   }
 
   implicitWidth: button.implicitWidth
@@ -304,6 +328,7 @@ Panel {
             width: parent.width - Style.space(188) - parent.spacing
             height: parent.height
             spacing: Style.space(8)
+            clip: true
 
             Row {
               width: parent.width
@@ -365,6 +390,7 @@ Panel {
             }
 
             Flickable {
+              id: appList
               width: parent.width
               height: parent.height - y
               clip: true
@@ -375,22 +401,62 @@ Panel {
 
               Column {
                 id: appCol
-                width: parent.width
-                spacing: Style.space(4)
+                width: appList.width
+                spacing: Style.space(2)
 
                 Repeater {
                   model: root.visibleApps
-                  delegate: Toggle {
+                  delegate: Item {
                     required property var modelData
                     width: appCol.width
-                    label: modelData.title || modelData.className
-                    description: (modelData.title && modelData.title !== modelData.className)
-                      ? modelData.className
-                      : ""
-                    checked: !!modelData.enabled
-                    foreground: root.foreground
-                    fontFamily: root.fontFamily
-                    onClicked: root.setApp(modelData.className, !modelData.enabled)
+                    height: Style.space(44)
+                    clip: true
+
+                    Image {
+                      id: appIcon
+                      width: Style.space(20)
+                      height: Style.space(20)
+                      anchors.left: parent.left
+                      anchors.leftMargin: Style.space(4)
+                      anchors.verticalCenter: parent.verticalCenter
+                      fillMode: Image.PreserveAspectFit
+                      asynchronous: true
+                      sourceSize.width: width * Screen.devicePixelRatio
+                      sourceSize.height: height * Screen.devicePixelRatio
+                      source: root.iconSourceForClass(modelData.className)
+                    }
+
+                    Text {
+                      anchors.left: appIcon.right
+                      anchors.leftMargin: Style.space(10)
+                      anchors.right: appSwitch.left
+                      anchors.rightMargin: Style.space(10)
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: modelData.title || modelData.className
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      elide: Text.ElideRight
+                      maximumLineCount: 1
+                      wrapMode: Text.NoWrap
+                    }
+
+                    ToggleSwitch {
+                      id: appSwitch
+                      anchors.right: parent.right
+                      anchors.rightMargin: Style.space(4)
+                      anchors.verticalCenter: parent.verticalCenter
+                      checked: !!modelData.enabled
+                      foreground: root.foreground
+                      onToggled: root.setApp(modelData.className, !modelData.enabled)
+                    }
+
+                    MouseArea {
+                      anchors.fill: parent
+                      anchors.rightMargin: appSwitch.width + Style.space(8)
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.setApp(modelData.className, !modelData.enabled)
+                    }
                   }
                 }
 
