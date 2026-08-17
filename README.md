@@ -4,10 +4,10 @@ Share **one** window in Meet, Zoom, or Discord. Followcast always shows the
 **full display** that has keyboard focus, including the bar and window chrome,
 and follows when that focus moves to another monitor.
 
-The portal cannot retarget a live share. Followcast is the dummy window you pick
-once. A daemon paints that window with the focused display (and a short
-Display N slide when you change screens). You should not see that dummy
-or the slide on your monitors.
+The portal cannot retarget a live share. Followcast is the single source window
+you pick once. A daemon paints it with the current focused display and updates
+that feed when focus moves. The source lives on a headless Hyprland output, so
+you do not see it on any physical monitor.
 
 Muted monitors or apps show the audience a branded **Hidden by Followcast**
 card instead of the real window.
@@ -32,29 +32,25 @@ npm install -g https://github.com/itz4blitz/followcast/releases/download/v0.2.0/
 ```
 
 `npm install -g` puts `followcast` on your PATH.
-
 Add to `~/.config/hypr/hyprland.lua`:
 
 ```lua
-hl.permission({ binary = "/usr/bin/wl-mirror", type = "screencopy", mode = "allow" })
-
--- One shareable window. Discord stays on "loading" if the dummy is
--- fully off-screen or on a special workspace. Clip two pixels onto
--- the last monitor so the portal gets frames.
-o.window({ class = "^at\\.yrlf\\.wl_mirror$", title = "^Followcast$" }, {
+-- One mapped source window on a headless output. Discord/Meet can capture it,
+-- but it never appears on a physical monitor.
+o.window({ title = "^Followcast$" }, {
   float = true,
   decorate = false,
   border_size = 0,
   rounding = 0,
   no_shadow = true,
   no_anim = true,
-  monitor = "DP-3",
+  monitor = "fc-dummy",
   no_initial_focus = true,
   no_focus = true,
   no_follow_mouse = true,
   render_unfocused = true,
   size = { 1280, 720 },
-  move = { 1438, 808 },
+  move = { 0, 0 },
 })
 ```
 
@@ -87,11 +83,10 @@ followcast --deny-class zoom --deny-class skype
 1. A window titled **Followcast** is already running after login.
 2. In the share picker, open **Windows** and pick **Followcast**. There
    is only that one Followcast entry.
-3. Change focus as usual. The share follows the focused app only if that
+3. Change focus as usual. The share follows the focused display only if that
    monitor and app are on in the policy. Crossing monitors plays a short
-   Display 1 → Display 2 slide so viewers can tell you moved screens.
-   When an app is muted, the same window shows the **Hidden by Followcast**
-   card.
+   direct cut to the new display. When an app is muted, the same window shows
+   the **Hidden by Followcast** card.
 4. Mute a monitor or app:
 
 ```bash
@@ -109,10 +104,10 @@ omarchy plugin add https://github.com/itz4blitz/blitz.followcast.git --enable
 
 The chip calls `followcast status` / `followcast policy`.
 
-You should not see a Followcast app window. The dummy hangs mostly off
-the last monitor so Discord can still get frames. When something is
-muted, a small **Hidden by Followcast** card is composited so the dummy
-has pixels to show; the bar chip is the control.
+You should not see a Followcast app window. The dummy is mapped on the
+headless `fc-dummy` output so Discord can capture it without exposing it on
+your desktop. When something is muted, the same dummy shows the **Hidden by
+Followcast** page; the bar chip is the control.
 
 ## Policy
 

@@ -84,6 +84,11 @@ describe('displayLabel', () => {
   it('falls back to Display 1 when the name is unknown', () => {
     expect(displayLabel([dp1], 'missing')).toBe('Display 1')
   })
+
+  it('does not count a headless share surface as a display', () => {
+    const headless = monitor({ id: 3, name: 'HEADLESS-1', x: 8000, y: 0, focused: false })
+    expect(displayLabel([dp1, hdmi, headless], 'HDMI-A-1')).toBe('Display 2')
+  })
 })
 
 describe('monitorSlide', () => {

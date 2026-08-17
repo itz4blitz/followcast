@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { regionsEqual, streamCommand } from '../../src/domain/streamCommand.ts'
 
 describe('streamCommand', () => {
-  it('formats a quoted slurp region line for wl-mirror --stream', () => {
+  it('names only the output so a global 2560x1440 box cannot leak two monitors', () => {
     expect(streamCommand({ output: 'HDMI-A-1', x: 100, y: 80, width: 200, height: 100 })).toBe(
-      "--region '100,80 200x100 HDMI-A-1'",
+      "--output 'HDMI-A-1'",
     )
   })
 
-  it('keeps integer coordinates that came from a clamp', () => {
+  it('keeps the focused output name and drops origin geometry', () => {
     expect(streamCommand({ output: 'DP-1', x: 0, y: 0, width: 1600, height: 900 })).toBe(
-      "--region '0,0 1600x900 DP-1'",
+      "--output 'DP-1'",
     )
   })
 })

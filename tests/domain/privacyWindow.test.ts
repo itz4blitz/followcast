@@ -107,6 +107,12 @@ describe('privacySlotRegion', () => {
     expect(privacySlotRegion([monitor(), hdmi, dell])).toMatchObject({ output: 'DP-3' })
   })
 
+  it('does not park the privacy slot on a headless share surface', () => {
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0, focused: false })
+    const headless = monitor({ id: 3, name: 'HEADLESS-1', x: 8000, y: 0, focused: false })
+    expect(privacySlotRegion([monitor(), hdmi, headless])).toMatchObject({ output: 'HDMI-A-1' })
+  })
+
   it('shrinks the slot when the last monitor is smaller than the default card', () => {
     const tiny = monitor({ name: 'eDP-1', width: 900, height: 600, scale: 1 })
     expect(privacySlotRegion([tiny])).toEqual({

@@ -1,3 +1,4 @@
+import { shareableMonitors } from './shareableOutput.ts'
 import type { FollowDecision, MonitorSnapshot } from './types.ts'
 
 export type SlideDirection = 'left' | 'right' | 'up' | 'down'
@@ -31,7 +32,9 @@ export function slideDirection(from: MonitorSnapshot, to: MonitorSnapshot): Slid
 }
 
 export function displayLabel(monitors: readonly MonitorSnapshot[], name: string): string {
-  const ordered = [...monitors].sort((left, right) => left.y - right.y || left.x - right.x)
+  const ordered = shareableMonitors(monitors).sort(
+    (left, right) => left.y - right.y || left.x - right.x,
+  )
   const index = ordered.findIndex((monitor) => monitor.name === name)
   // Stryker disable next-line EqualityOperator: index 0 is Display 1 either as < 0 ? 1 : 1 or <= 0 ? 1
   return `Display ${index < 0 ? 1 : index + 1}`

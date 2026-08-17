@@ -1,4 +1,5 @@
 import { windowToRegion } from './geometry.ts'
+import { shareableMonitors } from './shareableOutput.ts'
 import type { DesktopSnapshot, FollowRegion, MonitorSnapshot, WindowSnapshot } from './types.ts'
 
 const SLOT_WIDTH = 480
@@ -26,7 +27,7 @@ export function privacyRegionFrom(snapshot: DesktopSnapshot): FollowRegion | nul
 }
 
 export function privacySlotRegion(monitors: readonly MonitorSnapshot[]): FollowRegion | null {
-  const host = monitors.at(-1)
+  const host = shareableMonitors(monitors).at(-1)
   if (host === undefined) {
     return null
   }

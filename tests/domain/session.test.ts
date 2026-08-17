@@ -19,7 +19,7 @@ function desktop(overrides: Partial<DesktopSnapshot> = {}): DesktopSnapshot {
 describe('reduceSession', () => {
   it('emits a stream command on the first follow', () => {
     const step = reduceSession(empty, desktop(), options())
-    expect(step.command).toBe("--region '0,0 1600x900 DP-1'")
+    expect(step.command).toBe("--output 'DP-1'")
     expect(step.state.last).toEqual({
       kind: 'follow',
       address: '0xfox',
@@ -53,7 +53,7 @@ describe('reduceSession', () => {
       }),
       options(),
     )
-    expect(moved.command).toBeNull()
+    expect(moved.command).toBe("--output 'HDMI-A-1'")
     expect(moved.state.last?.kind).toBe('transition')
     const landed = reduceSession(
       moved.state,
@@ -65,7 +65,7 @@ describe('reduceSession', () => {
       options(),
       500,
     )
-    expect(landed.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
+    expect(landed.command).toBe("--output 'HDMI-A-1'")
     expect(landed.state.last?.kind).toBe('follow')
   })
 
@@ -127,7 +127,7 @@ describe('reduceSession', () => {
         privacyRegion: card,
       }),
     )
-    expect(step.command).toBe("--region '20,30 640x360 DP-1'")
+    expect(step.command).toBe("--output 'DP-1'")
     expect(step.state.last?.kind).toBe('privacy')
   })
 
@@ -204,7 +204,7 @@ describe('reduceSession', () => {
   it('emits a follow after a hold once a real window is focused', () => {
     const held = reduceSession(empty, desktop({ focusedAddress: null }), options())
     const followed = reduceSession(held.state, desktop(), options())
-    expect(followed.command).toBe("--region '0,0 1600x900 DP-1'")
+    expect(followed.command).toBe("--output 'DP-1'")
   })
 
   it('plays a monitor slide before following an app on another display', () => {
@@ -228,7 +228,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       10,
     )
-    expect(moved.command).toBeNull()
+    expect(moved.command).toBe("--output 'HDMI-A-1'")
     expect(moved.state.last).toMatchObject({
       kind: 'transition',
       direction: 'right',
@@ -261,7 +261,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       460,
     )
-    expect(landed.command).toBe("--region '1600,0 1600x900 HDMI-A-1'")
+    expect(landed.command).toBe("--output 'HDMI-A-1'")
     expect(landed.state.last?.kind).toBe('follow')
     expect(landed.state.pendingFollow).toBeNull()
   })
@@ -351,7 +351,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       80,
     )
-    expect(toDell.command).toBeNull()
+    expect(toDell.command).toBe("--output 'DP-3'")
     expect(toDell.state.last).toMatchObject({
       kind: 'transition',
       fromOutput: 'DP-1',

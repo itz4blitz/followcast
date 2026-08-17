@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { filePrivacyCard } from './cli/cardPublisher.ts'
+import { dummySurfaceEnv } from './cli/privacyCardProcess.ts'
 import { buildCliMain } from './cli/cliMain.ts'
 import { diskPolicy } from './cli/diskPolicy.ts'
 import { toDesktopSnapshot } from './hyprland/parse.ts'
@@ -64,6 +65,7 @@ const code = await buildCliMain({
                 : ([command, ...args] as const)
             const child = spawn(argv[0], [...argv.slice(1)], {
               stdio: ['pipe', 'ignore', 'inherit'],
+              env: dummySurfaceEnv(process.env),
             })
             const stdin = child.stdin
             if (stdin === null) {

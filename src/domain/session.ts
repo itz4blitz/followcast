@@ -92,7 +92,7 @@ export function reduceSession(
           last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },
           pendingFollow: follow,
         },
-        command: null,
+        command: streamCommand(follow.region),
       }
     }
     return { state: { last: state.last, pendingFollow: follow }, command: null }
@@ -121,7 +121,7 @@ export function reduceSession(
         last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },
         pendingFollow: follow,
       },
-      command: null,
+      command: streamCommand(follow.region),
     }
   }
   return { state: withLast(follow), command: streamCommand(follow.region) }

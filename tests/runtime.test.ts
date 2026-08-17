@@ -60,6 +60,57 @@ describe('createRuntimePorts', () => {
     await ports.mirror.stop()
   })
 
+  it('moves a window through the hyprctl dispatch interface', async () => {
+    const argv: string[][] = []
+    const ports = createRuntimePorts(
+      {
+        XDG_RUNTIME_DIR: '/run/user/1000',
+        HYPRLAND_INSTANCE_SIGNATURE: 'sig',
+      },
+      {
+        exec: async (command) => {
+          argv.push([...command])
+          return 'ok'
+        },
+        openLines: async function* () {},
+        which: () => '/usr/bin/grim',
+        spawn: () => ({ write: () => {}, kill: () => {} }),
+        schedule: () => () => {},
+        tickMs: 100,
+        signal: new AbortController().signal,
+      },
+    )
+    await ports.hyprland.moveWindow('0xabc', 1638, 1708)
+    expect(argv).toEqual([
+      [
+        'hyprctl',
+        'dispatch',
+        'hl.dsp.window.move({ x = 1638, y = 1708, window = "address:0xabc" })',
+      ],
+    ])
+  })
+
+  it('wraps dispatch failures with a labeled error', async () => {
+    const ports = createRuntimePorts(
+      {
+        XDG_RUNTIME_DIR: '/run/user/1000',
+        HYPRLAND_INSTANCE_SIGNATURE: 'sig',
+      },
+      {
+        exec: async () => {
+          throw new Error('no such window')
+        },
+        openLines: async function* () {},
+        which: () => '/usr/bin/grim',
+        spawn: () => ({ write: () => {}, kill: () => {} }),
+        schedule: () => () => {},
+        tickMs: 100,
+        signal: new AbortController().signal,
+      },
+    )
+    await expect(ports.hyprland.moveWindow('0xabc', 1, 2)).rejects.toThrow(/hyprctl dispatch move/)
+  })
+
   it('exposes a clock that yields on the injected schedule', async () => {
     const controller = new AbortController()
     let pulse: (() => void) | undefined

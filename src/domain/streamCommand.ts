@@ -1,7 +1,7 @@
 import type { FollowRegion } from './types.ts'
 
 export function streamCommand(region: FollowRegion): string {
-  return `--region '${region.x},${region.y} ${region.width}x${region.height} ${region.output}'`
+  return `--output '${region.output}'`
 }
 
 export function regionsEqual(left: FollowRegion, right: FollowRegion): boolean {

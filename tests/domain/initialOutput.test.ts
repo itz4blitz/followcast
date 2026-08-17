@@ -24,4 +24,13 @@ describe('initialOutput', () => {
   it('throws when there are no monitors', () => {
     expect(() => initialOutput([])).toThrow(/no monitor/)
   })
+
+  it('skips a focused headless output so the dummy never captures itself', () => {
+    expect(
+      initialOutput([
+        monitor({ id: 0, name: 'DP-1', focused: false }),
+        monitor({ id: 3, name: 'HEADLESS-1', focused: true }),
+      ]),
+    ).toBe('DP-1')
+  })
 })

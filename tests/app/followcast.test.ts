@@ -58,6 +58,23 @@ const selfMirror = {
   title: 'Followcast',
 }
 
+const surface = {
+  address: '0xsurface',
+  mapped: true,
+  hidden: false,
+  at: [1400, 750],
+  size: [1280, 720],
+  monitor: 1,
+  class: 'followcast.surface',
+  title: 'Followcast',
+}
+
+type Move = {
+  address: string
+  x: number
+  y: number
+}
+
 type World = {
   clients: unknown[]
   monitors: unknown[]
@@ -67,6 +84,7 @@ type World = {
   started: string[]
   sent: string[]
   stops: number
+  moves: Move[]
   now: number
 }
 
@@ -80,6 +98,7 @@ function world(seed: Partial<World> = {}): World {
     started: [],
     sent: [],
     stops: 0,
+    moves: [],
     now: 0,
     ...seed,
   }
@@ -92,6 +111,9 @@ function portsOf(w: World) {
       monitors: async () => w.monitors,
       activeWindow: async () => w.active,
       events: () => w.events,
+      moveWindow: async (address: string, x: number, y: number) => {
+        w.moves.push({ address, x, y })
+      },
     },
     mirror: {
       start: async (output: string) => {
@@ -141,7 +163,7 @@ describe('runFollowcast', () => {
     const handle = startFollowcast(portsOf(w), options(), controller.signal)
     await handle.ready
     expect(w.started).toEqual(['DP-1'])
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
     await shutdown(controller, w, handle.finished)
     expect(w.stops).toBe(1)
   })
@@ -158,11 +180,12 @@ describe('runFollowcast', () => {
     await new Promise<void>((resolve) => {
       setImmediate(resolve)
     })
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    await waitUntil(() => w.sent.length === 2)
+    expect(w.sent).toEqual(["--output 'DP-1'", "--output 'HDMI-A-1'"])
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 2)
-    expect(w.sent[1]).toBe("--region '2560,0 2560x1440 HDMI-A-1'")
+    await waitUntil(() => w.sent.length === 3)
+    expect(w.sent[2]).toBe("--output 'HDMI-A-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -178,7 +201,7 @@ describe('runFollowcast', () => {
     await new Promise<void>((resolve) => {
       setImmediate(resolve)
     })
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -213,7 +236,7 @@ describe('runFollowcast', () => {
     w.clients = [{ ...fox, size: [200, 100] }]
     w.ticks.push(undefined)
     await waitUntil(() => w.sent.length >= 1)
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -249,16 +272,17 @@ describe('runFollowcast', () => {
     w.active = { address: '0xcode' }
     w.events.push('activewindowv2>>0xcode')
     await waitUntil(() => published.some((item) => item?.kind === 'slide'))
+    expect(w.sent.at(-1)).toBe("--output 'HDMI-A-1'")
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 2)
+    await waitUntil(() => published.at(-1) === null)
     w.active = { address: '0xfox' }
     w.events.push('activewindowv2>>0xfox')
-    await waitUntil(() => published.filter((item) => item?.kind === 'slide').length >= 2)
+    await waitUntil(() => published.at(-1)?.kind === 'slide' && w.sent.at(-1) === "--output 'DP-1'")
     w.now = 1000
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '0,0 2560x1440 DP-1'")
+    await waitUntil(() => published.at(-1) === null)
+    expect(w.sent.at(-1)).toBe("--output 'DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -293,16 +317,17 @@ describe('runFollowcast', () => {
     w.active = { address: '0xcode' }
     w.ticks.push(undefined)
     await waitUntil(() => published.some((item) => item?.kind === 'slide'))
+    expect(w.sent.at(-1)).toBe("--output 'HDMI-A-1'")
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 2)
+    await waitUntil(() => published.at(-1) === null)
     w.active = { address: '0xfox' }
     w.ticks.push(undefined)
-    await waitUntil(() => published.filter((item) => item?.kind === 'slide').length >= 2)
+    await waitUntil(() => published.at(-1)?.kind === 'slide' && w.sent.at(-1) === "--output 'DP-1'")
     w.now = 1000
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.length === 3)
-    expect(w.sent[2]).toBe("--region '0,0 2560x1440 DP-1'")
+    await waitUntil(() => published.at(-1) === null)
+    expect(w.sent.at(-1)).toBe("--output 'DP-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -324,7 +349,7 @@ describe('runFollowcast', () => {
     w.events.close()
     w.ticks.close()
     await handle.finished
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
   })
 
   it('does not apply a privacy retarget from a refresh that started after abort', async () => {
@@ -426,7 +451,7 @@ describe('runFollowcast', () => {
     w.events.close()
     w.ticks.close()
     await handle.finished
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
   })
 
   it('publishes the privacy card when the focused app is toggled off', async () => {
@@ -448,7 +473,7 @@ describe('runFollowcast', () => {
     )
     await handle.ready
     expect(published).toEqual([{ appLabel: 'Mozilla Firefox' }])
-    expect(w.sent).toEqual(["--region '4624,1154 480x270 HDMI-A-1'"])
+    expect(w.sent).toEqual(["--output 'HDMI-A-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -462,7 +487,7 @@ describe('runFollowcast', () => {
     )
     await handle.ready
     expect(w.started).toEqual(['DP-1'])
-    expect(w.sent).toEqual(["--region '4624,1154 480x270 HDMI-A-1'"])
+    expect(w.sent).toEqual(["--output 'HDMI-A-1'"])
     await shutdown(controller, w, handle.finished)
     expect(w.stops).toBe(1)
   })
@@ -488,13 +513,15 @@ describe('runFollowcast', () => {
     expect(published.at(-1)).toEqual({
       kind: 'slide',
       direction: 'right',
+      fromOutput: 'DP-1',
+      toOutput: 'HDMI-A-1',
       fromLabel: 'Display 1',
       toLabel: 'Display 2',
     })
     w.now = 500
     w.ticks.push(undefined)
-    await waitUntil(() => w.sent.at(-1) === "--region '2560,0 2560x1440 HDMI-A-1'")
-    expect(published.at(-1)).toBeNull()
+    await waitUntil(() => published.at(-1) === null)
+    expect(w.sent.at(-1)).toBe("--output 'HDMI-A-1'")
     await shutdown(controller, w, handle.finished)
   })
 
@@ -513,7 +540,7 @@ describe('runFollowcast', () => {
     const handle = startFollowcast(ports, options(), controller.signal)
     await handle.ready
     expect(published).toEqual([null])
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
     await shutdown(controller, w, handle.finished)
   })
 
@@ -524,5 +551,91 @@ describe('runFollowcast', () => {
     ).rejects.toThrow(/no monitor/)
     expect(w.started).toEqual([])
     expect(w.stops).toBe(0)
+  })
+})
+
+describe('surface parking', () => {
+  it('parks a drifted surface window off the bottom-right corner', async () => {
+    const w = world({ clients: [fox, surface] })
+    const controller = new AbortController()
+    const handle = startFollowcast(portsOf(w), options(), controller.signal)
+    await handle.ready
+    await waitUntil(() => w.moves.length === 1)
+    expect(w.moves[0]).toEqual({ address: '0xsurface', x: 5118, y: 1438 })
+    await shutdown(controller, w, handle.finished)
+  })
+
+  it('does not move a surface window that is already parked', async () => {
+    const parked = { ...surface, at: [5118, 1438] }
+    const w = world({ clients: [fox, parked] })
+    const controller = new AbortController()
+    const handle = startFollowcast(portsOf(w), options(), controller.signal)
+    await handle.ready
+    w.ticks.push(undefined)
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+    expect(w.moves).toEqual([])
+    await shutdown(controller, w, handle.finished)
+  })
+
+  it('re-parks when the display layout changes', async () => {
+    const parked = { ...surface, at: [5118, 1438] }
+    const w = world({ clients: [fox, parked] })
+    const controller = new AbortController()
+    const handle = startFollowcast(portsOf(w), options(), controller.signal)
+    await handle.ready
+    expect(w.moves).toEqual([])
+    w.monitors = [dp1]
+    w.ticks.push(undefined)
+    await waitUntil(() => w.moves.length === 1)
+    expect(w.moves[0]).toEqual({ address: '0xsurface', x: 2558, y: 1438 })
+    await shutdown(controller, w, handle.finished)
+  })
+
+  it('keeps running when the move dispatch fails', async () => {
+    const w = world({ clients: [fox, surface] })
+    const controller = new AbortController()
+    const ports = portsOf(w)
+    const hyprland = {
+      ...ports.hyprland,
+      moveWindow: async () => {
+        throw new Error('dispatch failed')
+      },
+    }
+    const handle = startFollowcast({ ...ports, hyprland }, options(), controller.signal)
+    await handle.ready
+    w.ticks.push(undefined)
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+    expect(w.sent.length).toBeGreaterThan(0)
+    await shutdown(controller, w, handle.finished)
+    expect(w.stops).toBe(1)
+  })
+
+  it('retries the park after a failed dispatch', async () => {
+    const w = world({ clients: [fox, surface] })
+    const controller = new AbortController()
+    const ports = portsOf(w)
+    let failures = 0
+    const moves: Move[] = []
+    const hyprland = {
+      ...ports.hyprland,
+      moveWindow: async (address: string, x: number, y: number) => {
+        if (failures < 1) {
+          failures += 1
+          throw new Error('dispatch failed')
+        }
+        moves.push({ address, x, y })
+      },
+    }
+    const handle = startFollowcast({ ...ports, hyprland }, options(), controller.signal)
+    await handle.ready
+    await waitUntil(() => failures === 1)
+    w.ticks.push(undefined)
+    await waitUntil(() => moves.length === 1)
+    expect(moves[0]).toEqual({ address: '0xsurface', x: 5118, y: 1438 })
+    await shutdown(controller, w, handle.finished)
   })
 })

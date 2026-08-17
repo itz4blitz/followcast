@@ -34,5 +34,13 @@ export function createHyprlandPort(deps: HyprlandPortDeps): HyprlandPort {
     monitors: () => readJson(deps.exec, 'monitors'),
     activeWindow: () => readJson(deps.exec, 'activewindow'),
     events: () => deps.events(),
+    moveWindow: async (address, x, y) => {
+      const expression = `hl.dsp.window.move({ x = ${x}, y = ${y}, window = "address:${address}" })`
+      try {
+        await deps.exec(['hyprctl', 'dispatch', expression])
+      } catch (error) {
+        throw new Error(`hyprctl dispatch move: ${formatError(error)}`, { cause: error })
+      }
+    },
   }
 }

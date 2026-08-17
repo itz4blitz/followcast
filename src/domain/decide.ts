@@ -1,5 +1,6 @@
 import { monitorToRegion, windowToRegion } from './geometry.ts'
 import { isAppAllowed, isMonitorAllowed } from './policy.ts'
+import { isShareableOutput } from './shareableOutput.ts'
 import type {
   DesktopSnapshot,
   FollowDecision,
@@ -45,7 +46,7 @@ export function decideFollow(snapshot: DesktopSnapshot, options: FollowOptions):
     return { kind: 'hold', reason: 'self' }
   }
   const host = findMonitor(snapshot.monitors, focused.monitorId)
-  if (host === undefined) {
+  if (host === undefined || !isShareableOutput(host.name)) {
     return { kind: 'hold', reason: 'no-monitor' }
   }
   const appLabel = focused.title === '' ? focused.className : focused.title

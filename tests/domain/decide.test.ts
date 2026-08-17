@@ -184,6 +184,21 @@ describe('decideFollow', () => {
     ).toEqual({ kind: 'hold', reason: 'no-monitor' })
   })
 
+  it('holds when the focused window sits on the headless share surface', () => {
+    const dummyHost = monitor({ id: 3, name: 'HEADLESS-1' })
+    const stray = windowSnap({ address: '0xstray', monitorId: 3 })
+    expect(
+      decideFollow(
+        desktop({
+          focusedAddress: stray.address,
+          windows: [stray],
+          monitors: [monitor(), dummyHost],
+        }),
+        options(),
+      ),
+    ).toEqual({ kind: 'hold', reason: 'no-monitor' })
+  })
+
   it('holds when the window-monitor intersection is empty', () => {
     const off = windowSnap({
       address: '0xoff',

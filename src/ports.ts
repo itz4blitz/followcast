@@ -3,6 +3,7 @@ export type HyprlandPort = {
   monitors(): Promise<unknown>
   activeWindow(): Promise<unknown>
   events(): AsyncIterable<string>
+  moveWindow(address: string, x: number, y: number): Promise<void>
 }
 
 export type MirrorPort = {
@@ -19,6 +20,8 @@ type ClockPort = {
 type SlideCard = {
   readonly kind: 'slide'
   readonly direction: 'left' | 'right' | 'up' | 'down'
+  readonly fromOutput: string
+  readonly toOutput: string
   readonly fromLabel: string
   readonly toLabel: string
 }

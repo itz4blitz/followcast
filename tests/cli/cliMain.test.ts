@@ -55,6 +55,7 @@ function fakePorts(): {
         monitors: async () => [dp1],
         activeWindow: async () => ({ address: '0xfox' }),
         events: () => events,
+        moveWindow: async () => {},
       },
       mirror: {
         start: async () => {},
@@ -178,6 +179,7 @@ describe('buildCliMain', () => {
           monitors: async () => [dp1],
           activeWindow: async () => ({ address: '0xfox' }),
           events: () => events,
+          moveWindow: async () => {},
         },
         mirror: {
           start: async () => {},
@@ -196,13 +198,13 @@ describe('buildCliMain', () => {
       signal: controller.signal,
     })
     await waitUntil(() => sent.length > 0)
-    expect(sent).toEqual(["--region '0,0 1920x1080 DP-1'"])
+    expect(sent).toEqual(["--output 'DP-1'"])
     expect(published).toEqual([null])
     stored = { monitors: {}, apps: { firefox: false } }
     ticks.push(undefined)
     await waitUntil(() => published.some((item) => item?.appLabel === 'Mozilla Firefox'))
     expect(published).toEqual([null, { appLabel: 'Mozilla Firefox' }])
-    expect(sent.at(-1)).toBe("--region '40,50 640x360 DP-1'")
+    expect(sent.at(-1)).toBe("--output 'DP-1'")
     controller.abort()
     events.close()
     ticks.close()

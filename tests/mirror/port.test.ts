@@ -17,24 +17,24 @@ describe('wlMirrorArgv', () => {
 })
 
 describe('createMirrorPort', () => {
-  it('refuses to start when wl-mirror is not on PATH', async () => {
+  it('refuses to start when grim is not on PATH', async () => {
     const port = createMirrorPort({
       which: () => null,
       spawn: () => {
         throw new Error('should not spawn')
       },
     })
-    await expect(port.start('DP-1')).rejects.toThrow(/wl-mirror/)
+    await expect(port.start('DP-1')).rejects.toThrow(/grim/)
   })
 
-  it('spawns wl-mirror, writes stream lines, and kills on stop', async () => {
+  it('spawns the surface and immediately streams the initial output', async () => {
     const writes: string[] = []
     let killed = false
     const asked: string[] = []
     const port = createMirrorPort({
       which: (binary) => {
         asked.push(binary)
-        return binary === 'wl-mirror' ? '/usr/bin/wl-mirror' : null
+        return binary === 'grim' ? '/usr/bin/grim' : null
       },
       spawn: (argv) => {
         expect(argv[0]).toBe('wl-mirror')
@@ -49,16 +49,17 @@ describe('createMirrorPort', () => {
       },
     })
     await port.start('DP-1')
-    expect(asked).toEqual(['wl-mirror'])
-    port.send("--region '0,0 10x10 DP-1'")
-    expect(writes).toEqual(["--region '0,0 10x10 DP-1'"])
+    expect(asked).toEqual(['grim'])
+    expect(writes).toEqual(["--output 'DP-1'"])
+    port.send("--output 'HDMI-A-1'")
+    expect(writes).toEqual(["--output 'DP-1'", "--output 'HDMI-A-1'"])
     await port.stop()
     expect(killed).toBe(true)
   })
 
   it('stop is a no-op when the child was never started', async () => {
     const port = createMirrorPort({
-      which: () => '/usr/bin/wl-mirror',
+      which: () => '/usr/bin/grim',
       spawn: () => {
         throw new Error('should not spawn')
       },

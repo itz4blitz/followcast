@@ -27,10 +27,11 @@ export function createMirrorPort(deps: MirrorPortDeps): MirrorPort {
   let child: SpawnedMirror | null = null
   return {
     start: async (output: string) => {
-      if (deps.which('wl-mirror') === null) {
-        throw new Error('wl-mirror is not installed; pacman -S wl-mirror')
+      if (deps.which('grim') === null) {
+        throw new Error('grim is not installed; pacman -S grim')
       }
       child = deps.spawn(wlMirrorArgv(output))
+      child.write(`--output '${output}'`)
     },
     send: (line: string) => {
       if (child !== null) {

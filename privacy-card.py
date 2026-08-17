@@ -5,24 +5,21 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 import threading
 from pathlib import Path
 
+from capture_argv import destination_output, grim_live_argv, parse_stream_output
+
 import gi
 
 gi.require_version("Gtk", "4.0")
-gi.require_version("Gdk", "4.0")
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
+from gi.repository import GdkPixbuf, GLib, Gtk  # noqa: E402
 
 WIDTH = 1280
 HEIGHT = 720
-REGION_LINE = re.compile(
-    r"--region\s+'?(?P<x>-?\d+),(?P<y>-?\d+)\s+(?P<w>\d+)x(?P<h>\d+)(?:\s+(?P<output>\S+?))?'?\s*$"
-)
 
 
 def state_path() -> Path:
@@ -34,12 +31,17 @@ class FollowcastWindow(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application) -> None:
         super().__init__(application=app, title="Followcast")
         self.set_default_size(WIDTH, HEIGHT)
+        self.set_size_request(WIDTH, HEIGHT)
         self.set_decorated(False)
-        self.region: tuple[int, int, int, int] | None = None
+        self.output: str | None = None
         self._slide_key = ""
         self.modes = Gtk.Stack()
         self.live = Gtk.Picture()
-        self.live.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.live.set_content_fit(Gtk.ContentFit.FILL)
+        self.live.set_can_shrink(True)
+        self.live.set_hexpand(True)
+        self.live.set_vexpand(True)
+        self.live.set_size_request(WIDTH, HEIGHT)
         privacy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         privacy.set_valign(Gtk.Align.CENTER)
         privacy.set_halign(Gtk.Align.CENTER)
@@ -52,17 +54,20 @@ class FollowcastWindow(Gtk.ApplicationWindow):
         privacy.append(self.kicker)
         privacy.append(self.app_name)
         privacy.append(self.detail)
-        slide = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.modes.set_hexpand(True)
+        self.modes.set_vexpand(True)
+        self.modes.set_size_request(WIDTH, HEIGHT)
         self.slide_stack = Gtk.Stack()
         self.slide_stack.set_transition_duration(450)
-        self.from_card, self.from_name = self._display_card("Display 1")
-        self.to_card, self.to_name = self._display_card("Display 2")
-        self.slide_stack.add_named(self.from_card, "from")
-        self.slide_stack.add_named(self.to_card, "to")
-        slide.append(self.slide_stack)
+        self.slide_stack.set_hexpand(True)
+        self.slide_stack.set_vexpand(True)
+        self.from_shot = self._slide_page()
+        self.to_shot = self._slide_page()
+        self.slide_stack.add_named(self.from_shot, "from")
+        self.slide_stack.add_named(self.to_shot, "to")
         self.modes.add_named(self.live, "live")
         self.modes.add_named(privacy, "privacy")
-        self.modes.add_named(slide, "slide")
+        self.modes.add_named(self.slide_stack, "slide")
         self.set_child(self.modes)
         css = Gtk.CssProvider()
         css.load_from_data(
@@ -71,10 +76,6 @@ class FollowcastWindow(Gtk.ApplicationWindow):
             .kicker { color: #9aa3b5; font-size: 18px; }
             .app { color: #f4f6fb; font-size: 36px; font-weight: 600; }
             .detail { color: #c5cddb; font-size: 16px; }
-            .display-card { background: #1b1f2a; }
-            .display-kicker { color: #8b93a7; font-size: 16px; letter-spacing: 2px; }
-            .display-name { color: #f4f6fb; font-size: 64px; font-weight: 650; }
-            .display-hint { color: #9aa3b5; font-size: 18px; }
             """
         )
         Gtk.StyleContext.add_provider_for_display(
@@ -84,39 +85,24 @@ class FollowcastWindow(Gtk.ApplicationWindow):
         GLib.timeout_add(80, self.tick)
         threading.Thread(target=self._read_stdin, daemon=True).start()
 
-    def _display_card(self, label: str) -> tuple[Gtk.Box, Gtk.Label]:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.add_css_class("display-card")
-        box.set_valign(Gtk.Align.CENTER)
-        box.set_halign(Gtk.Align.CENTER)
-        box.set_hexpand(True)
-        box.set_vexpand(True)
-        kicker = Gtk.Label(label="MOVED DISPLAY")
-        kicker.add_css_class("display-kicker")
-        name = Gtk.Label(label=label)
-        name.add_css_class("display-name")
-        hint = Gtk.Label(label="Followcast")
-        hint.add_css_class("display-hint")
-        box.append(kicker)
-        box.append(name)
-        box.append(hint)
-        return box, name
+    def _slide_page(self) -> Gtk.Picture:
+        picture = Gtk.Picture()
+        picture.set_content_fit(Gtk.ContentFit.FILL)
+        picture.set_can_shrink(True)
+        picture.set_hexpand(True)
+        picture.set_vexpand(True)
+        picture.set_size_request(WIDTH, HEIGHT)
+        return picture
 
     def _read_stdin(self) -> None:
         for raw in sys.stdin:
-            match = REGION_LINE.search(raw.strip())
-            if match is None:
+            output = parse_stream_output(raw)
+            if output is None:
                 continue
-            region = (
-                int(match.group("x")),
-                int(match.group("y")),
-                int(match.group("w")),
-                int(match.group("h")),
-            )
-            GLib.idle_add(self._set_region, region)
+            GLib.idle_add(self._set_output, output)
 
-    def _set_region(self, region: tuple[int, int, int, int]) -> bool:
-        self.region = region
+    def _set_output(self, output: str) -> bool:
+        self.output = output
         return False
 
     def tick(self) -> bool:
@@ -144,15 +130,24 @@ class FollowcastWindow(Gtk.ApplicationWindow):
 
     def _play_slide(self, data: dict[str, object]) -> None:
         direction = str(data.get("direction") or "right")
-        from_label = str(data.get("fromLabel") or "Display 1")
-        to_label = str(data.get("toLabel") or "Display 2")
-        key = f"{direction}:{from_label}:{to_label}"
-        self.modes.set_visible_child_name("slide")
+        from_output = str(data.get("fromOutput") or "")
+        to_output = str(data.get("toOutput") or "")
+        key = f"{direction}:{from_output}:{to_output}"
         if key == self._slide_key:
+            self.modes.set_visible_child_name("slide")
+            return
+        if from_output == "" or to_output == "":
+            return
+        dest = destination_output(data)
+        if dest is not None:
+            self.output = dest
+        from_pix = self._grab_output(from_output)
+        to_pix = self._grab_output(to_output)
+        if from_pix is None or to_pix is None:
             return
         self._slide_key = key
-        self.from_name.set_text(from_label)
-        self.to_name.set_text(to_label)
+        self.from_shot.set_pixbuf(from_pix)
+        self.to_shot.set_pixbuf(to_pix)
         transitions = {
             "right": Gtk.StackTransitionType.SLIDE_LEFT,
             "left": Gtk.StackTransitionType.SLIDE_RIGHT,
@@ -163,29 +158,39 @@ class FollowcastWindow(Gtk.ApplicationWindow):
             transitions.get(direction, Gtk.StackTransitionType.SLIDE_LEFT)
         )
         self.slide_stack.set_visible_child_name("from")
+        self.modes.set_visible_child_name("slide")
         GLib.idle_add(self.slide_stack.set_visible_child_name, "to")
 
     def _grab(self) -> None:
-        if self.region is None:
+        if self.output is None:
             return
-        x, y, width, height = self.region
+        pixbuf = self._grab_output(self.output)
+        if pixbuf is not None:
+            self.live.set_pixbuf(pixbuf)
+
+    def _grab_output(self, output: str) -> GdkPixbuf.Pixbuf | None:
+        return self._png_to_pixbuf(grim_live_argv(output))
+
+    def _png_to_pixbuf(self, argv: list[str]) -> GdkPixbuf.Pixbuf | None:
         try:
-            png = subprocess.check_output(
-                ["grim", "-g", f"{x},{y} {width}x{height}", "-"],
-                timeout=0.4,
-            )
+            png = subprocess.check_output(argv, timeout=0.5)
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            return
+            return None
         loader = GdkPixbuf.PixbufLoader.new_with_type("png")
         try:
             loader.write(png)
             loader.close()
         except GLib.Error:
-            return
+            return None
         pixbuf = loader.get_pixbuf()
-        if pixbuf is not None:
-            texture = Gdk.Texture.new_for_pixbuf(pixbuf)
-            self.live.set_paintable(texture)
+        if pixbuf is None:
+            return None
+        if pixbuf.get_width() != WIDTH or pixbuf.get_height() != HEIGHT:
+            pixbuf = pixbuf.scale_simple(WIDTH, HEIGHT, GdkPixbuf.InterpType.BILINEAR)
+        if pixbuf is None:
+            return None
+        self.queue_draw()
+        return pixbuf
 
 
 class FollowcastApp(Gtk.Application):

@@ -20,6 +20,7 @@
     "dist",
     "omarchy-plugin",
     "privacy-card.py",
+    "capture_argv.py",
     "LICENSE",
     "README.md"
   ],
@@ -34,11 +35,12 @@
     "knip": "knip --max-issues 0",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:python": "python3 -m unittest discover -s tests -p 'test_*.py'",
     "coverage": "vitest run --coverage",
     "mutation": "stryker run stryker.config.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "npm run build && node dist/cli.js",
-    "ci": "npm run typecheck && npm run lint && npm run format && npm run knip && npm test && npm run coverage && npm run mutation"
+    "ci": "npm run typecheck && npm run lint && npm run format && npm run knip && npm test && npm run test:python && npm run coverage && npm run mutation"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
