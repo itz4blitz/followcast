@@ -14,16 +14,24 @@ card instead of the real window.
 
 ## Install
 
+Followcast is **not** on the npm registry. Install the CLI tarball from a
+[GitHub Release](https://github.com/itz4blitz/followcast/releases).
+
+Needs Node 20+ plus `wl-mirror`, `python-gobject`, `gtk4`, and `gtk4-layer-shell`.
+
 ```bash
 pacman -S wl-mirror python-gobject gtk4 gtk4-layer-shell
-git clone https://github.com/itz4blitz/followcast.git
-cd followcast
-npm install
-npm run build
-npm link
+gh release download --repo itz4blitz/followcast --pattern 'followcast-*.tgz'
+npm install -g ./followcast-*.tgz
 ```
 
-`npm link` puts `followcast` on your PATH.
+Without `gh`, pin the current asset:
+
+```bash
+npm install -g https://github.com/itz4blitz/followcast/releases/download/v0.2.0/followcast-0.2.0.tgz
+```
+
+`npm install -g` puts `followcast` on your PATH.
 
 Add to `~/.config/hypr/hyprland.lua`:
 
@@ -92,9 +100,14 @@ followcast policy set-app slack off
 followcast status
 ```
 
-On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/blitz.followcast`
-and add `blitz.followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
-calls `followcast status` / `followcast policy`.
+On Omarchy, install the bar chip from
+[blitz.followcast](https://github.com/itz4blitz/blitz.followcast):
+
+```bash
+omarchy plugin add https://github.com/itz4blitz/blitz.followcast.git --enable
+```
+
+The chip calls `followcast status` / `followcast policy`.
 
 You should not see a Followcast app window. The dummy hangs mostly off
 the last monitor so Discord can still get frames. When something is
@@ -112,6 +125,11 @@ app. Hyprland group members are separate apps.
 ## Develop
 
 ```bash
+git clone https://github.com/itz4blitz/followcast.git
+cd followcast
+npm install
+npm run build
+npm link
 npm test
 npm run coverage
 npm run mutation
