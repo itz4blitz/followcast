@@ -16,7 +16,11 @@ describe('withLayerShellPreload', () => {
   })
 
   it('omits undefined environment values', () => {
-    const env = withLayerShellPreload({ HOME: '/home/dev', EMPTY: undefined, LD_PRELOAD: undefined })
+    const env = withLayerShellPreload({
+      HOME: '/home/dev',
+      EMPTY: undefined,
+      LD_PRELOAD: undefined,
+    })
     expect(Object.hasOwn(env, 'EMPTY')).toBe(false)
     expect(Object.keys(env).sort()).toEqual(['HOME', 'LD_PRELOAD'])
     expect(env.HOME).toBe('/home/dev')

@@ -114,7 +114,11 @@ function apply(
     // Stryker disable next-line ConditionalExpression: equivalent — reduceSession always leaves last set
     if (last !== null && last.kind === 'privacy') {
       card.publish({ appLabel: last.appLabel })
-    } else if (last !== null && last.kind === 'transition') {
+    } else if (
+      // Stryker disable next-line ConditionalExpression: equivalent — reduceSession always leaves last set
+      last !== null &&
+      last.kind === 'transition'
+    ) {
       card.publish({
         kind: 'slide',
         direction: last.direction,

@@ -26,6 +26,7 @@ export function slideDirection(from: MonitorSnapshot, to: MonitorSnapshot): Slid
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0 ? 'right' : 'left'
   }
+  // Stryker disable next-line EqualityOperator: dy === 0 cannot reach this branch; abs(dx) < abs(dy) requires dy !== 0
   return dy >= 0 ? 'down' : 'up'
 }
 

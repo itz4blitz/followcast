@@ -82,7 +82,7 @@ export type FollowDecision =
       readonly reason: PrivacyReason
     }
 
-export type TransitionDecision = {
+type TransitionDecision = {
   readonly kind: 'transition'
   readonly fromOutput: string
   readonly toOutput: string

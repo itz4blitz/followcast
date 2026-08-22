@@ -50,6 +50,27 @@ describe('slideDirection', () => {
     const b = monitor({ name: 'B', x: 0, y: 0, width: 100, height: 100, scale: 1 })
     expect(slideDirection(a, b)).toBe('right')
   })
+
+  it('uses physical pixels so a 2x-scaled panel on the left is still left of its neighbor', () => {
+    const scaled = monitor({ name: 'A', x: 0, y: 0, width: 200, height: 200, scale: 2 })
+    const native = monitor({ name: 'B', x: 80, y: 0, width: 100, height: 200, scale: 1 })
+    expect(slideDirection(scaled, native)).toBe('right')
+    expect(slideDirection(native, scaled)).toBe('left')
+  })
+
+  it('uses half the scaled width when comparing centers, not double', () => {
+    const left = monitor({ name: 'A', x: 0, y: 0, width: 200, height: 100, scale: 1 })
+    const right = monitor({ name: 'B', x: 150, y: 0, width: 100, height: 100, scale: 1 })
+    expect(slideDirection(left, right)).toBe('right')
+    expect(slideDirection(right, left)).toBe('left')
+  })
+
+  it('slides up when a tall monitor sits slightly above a short neighbor', () => {
+    const tall = monitor({ name: 'A', x: 0, y: 0, width: 100, height: 400, scale: 1 })
+    const short = monitor({ name: 'B', x: 0, y: 50, width: 100, height: 100, scale: 1 })
+    expect(slideDirection(tall, short)).toBe('up')
+    expect(slideDirection(short, tall)).toBe('down')
+  })
 })
 
 describe('displayLabel', () => {
@@ -92,6 +113,10 @@ describe('monitorSlide', () => {
 
   it('returns null when a monitor is missing from the snapshot', () => {
     expect(monitorSlide(follow('DP-1'), follow('HDMI-A-1'), [dp1])).toBeNull()
+  })
+
+  it('returns null when the source monitor is missing from the snapshot', () => {
+    expect(monitorSlide(follow('HDMI-A-1'), follow('DP-1'), [dp1])).toBeNull()
   })
 
   it('returns null when the previous decision is not a follow', () => {

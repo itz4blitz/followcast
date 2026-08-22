@@ -327,6 +327,65 @@ describe('runFollowcast', () => {
     expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
   })
 
+  it('does not apply a privacy retarget from a refresh that started after abort', async () => {
+    const w = world()
+    const controller = new AbortController()
+    let release: (() => void) | undefined
+    let reads = 0
+    const p = portsOf(w)
+    const hyprland = {
+      ...p.hyprland,
+      clients: async () => {
+        reads += 1
+        if (reads === 1) {
+          return w.clients
+        }
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return w.clients
+      },
+    }
+    const handle = startFollowcast(
+      { ...p, hyprland },
+      options({ policy: { monitors: {}, apps: { slack: false } } }),
+      controller.signal,
+    )
+    await handle.ready
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    w.clients = [
+      {
+        address: '0xslack',
+        mapped: true,
+        hidden: false,
+        at: [10, 20],
+        size: [800, 600],
+        monitor: 0,
+        class: 'slack',
+        title: 'Slack',
+      },
+    ]
+    w.active = { address: '0xslack' }
+    w.events.push('activewindowv2>>0xslack')
+    await waitUntil(() => release !== undefined)
+    controller.abort()
+    const finishHang = release
+    expect(finishHang).toBeDefined()
+    if (finishHang === undefined) {
+      throw new Error('refresh did not start')
+    }
+    finishHang()
+    for (let extra = 0; extra < 8; extra += 1) {
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve)
+      })
+    }
+    w.events.close()
+    w.ticks.close()
+    await handle.finished
+    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+  })
+
   it('does not apply a refresh that started after abort', async () => {
     const w = world()
     const controller = new AbortController()

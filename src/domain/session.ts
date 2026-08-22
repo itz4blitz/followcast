@@ -61,13 +61,19 @@ export function reduceSession(
     return { state: withLast(decision), command: streamCommand(region) }
   }
   const follow = decision
-  if (state.last !== null && state.last.kind === 'transition' && nowMs < state.last.untilMs) {
+  if (
+    state.last !== null &&
+    // Stryker disable next-line ConditionalExpression: only TransitionDecision has untilMs
+    state.last.kind === 'transition' &&
+    nowMs < state.last.untilMs
+  ) {
     if (sameFollow(state.pendingFollow, follow)) {
       return { state, command: null }
     }
     const slide = monitorSlide(
       {
         kind: 'follow',
+        // Stryker disable next-line LogicalOperator: address is unused by monitorSlide (kind + region.output only)
         address: state.pendingFollow?.address ?? follow.address,
         region: {
           output: state.last.fromOutput,
@@ -92,15 +98,24 @@ export function reduceSession(
     return { state: { last: state.last, pendingFollow: follow }, command: null }
   }
   if (sameFollow(state.last, follow) || sameFollow(state.pendingFollow, follow)) {
-    if (state.last !== null && state.last.kind === 'transition') {
+    if (
+      // Stryker disable next-line ConditionalExpression: pendingFollow is only set when last is already a transition
+      state.last !== null &&
+      state.last.kind === 'transition'
+    ) {
       return { state: withLast(follow), command: streamCommand(follow.region) }
     }
     return { state, command: null }
   }
   const previousFollow =
+    // Stryker disable next-line ConditionalExpression: pendingFollow is only set while last is a transition; the next guard then ignores that slide
     state.last !== null && state.last.kind === 'follow' ? state.last : state.pendingFollow
   const slide = monitorSlide(previousFollow, follow, snapshot.monitors)
-  if (slide !== null && (state.last === null || state.last.kind !== 'transition')) {
+  if (
+    slide !== null &&
+    // Stryker disable next-line ConditionalExpression: last is never null when a slide exists
+    (state.last === null || state.last.kind !== 'transition')
+  ) {
     return {
       state: {
         last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },

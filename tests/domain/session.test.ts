@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MONITOR_SLIDE_MS } from '../../src/domain/monitorSlide.ts'
 import { reduceSession } from '../../src/domain/session.ts'
 import { monitor, options, windowSnap } from '../fixtures.ts'
 import type { DesktopSnapshot, SessionState } from '../../src/domain/types.ts'
@@ -356,8 +357,25 @@ describe('reduceSession', () => {
       fromOutput: 'DP-1',
       toOutput: 'DP-3',
       direction: 'down',
+      untilMs: 80 + MONITOR_SLIDE_MS,
     })
     expect(toDell.state.pendingFollow).toMatchObject({ address: '0xmail' })
+    const stillSliding = reduceSession(
+      toDell.state,
+      desktop({
+        focusedAddress: mail.address,
+        windows: [mail],
+        monitors: [monitor(), hdmi, dell],
+      }),
+      options({ privacyRegion: slot }),
+      200,
+    )
+    expect(stillSliding.command).toBeNull()
+    expect(stillSliding.state.last).toMatchObject({
+      kind: 'transition',
+      toOutput: 'DP-3',
+      untilMs: 80 + MONITOR_SLIDE_MS,
+    })
   })
 
   it('keeps the slide when focus stays on the destination monitor during the slide', () => {
@@ -435,7 +453,107 @@ describe('reduceSession', () => {
       80,
     )
     expect(updated.command).toBeNull()
-    expect(updated.state.last?.kind).toBe('transition')
+    expect(updated.state.last).toMatchObject({
+      kind: 'transition',
+      toOutput: 'HDMI-A-1',
+      untilMs: 10 + MONITOR_SLIDE_MS,
+    })
     expect(updated.state.pendingFollow?.region).toMatchObject({ output: 'HDMI-A-1', x: 1800 })
+  })
+
+  it('keeps the slide playing when focus returns to the source monitor mid-transition', () => {
+    const slot = { output: 'DP-1', x: 1, y: 2, width: 480, height: 270 }
+    const first = reduceSession(empty, desktop(), options({ privacyRegion: slot }), 0)
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
+    const code = windowSnap({
+      address: '0xcode',
+      className: 'Code',
+      monitorId: 1,
+      at: { x: 1700, y: 80 },
+      size: { width: 200, height: 100 },
+    })
+    const moved = reduceSession(
+      first.state,
+      desktop({
+        focusedAddress: code.address,
+        windows: [code],
+        monitors: [monitor(), hdmi],
+      }),
+      options({ privacyRegion: slot }),
+      10,
+    )
+    const bounced = reduceSession(
+      moved.state,
+      desktop({
+        focusedAddress: '0xfox',
+        windows: [
+          windowSnap({ address: '0xfox', className: 'firefox', title: 'Mozilla Firefox' }),
+          code,
+        ],
+        monitors: [monitor(), hdmi],
+      }),
+      options({ privacyRegion: slot }),
+      80,
+    )
+    expect(bounced.command).toBeNull()
+    expect(bounced.state.last).toMatchObject({
+      kind: 'transition',
+      fromOutput: 'DP-1',
+      toOutput: 'HDMI-A-1',
+      untilMs: 10 + MONITOR_SLIDE_MS,
+    })
+    expect(bounced.state.pendingFollow).toMatchObject({ address: '0xfox' })
+  })
+
+  it('follows a third display immediately once the slide clock has expired', () => {
+    const slot = { output: 'DP-1', x: 1, y: 2, width: 480, height: 270 }
+    const first = reduceSession(empty, desktop(), options({ privacyRegion: slot }), 0)
+    const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
+    const dell = monitor({
+      id: 2,
+      name: 'DP-3',
+      x: 200,
+      y: 900,
+      width: 1920,
+      height: 1080,
+      scale: 1,
+    })
+    const code = windowSnap({
+      address: '0xcode',
+      className: 'Code',
+      monitorId: 1,
+      at: { x: 1700, y: 80 },
+      size: { width: 200, height: 100 },
+    })
+    const mail = windowSnap({
+      address: '0xmail',
+      className: 'thunderbird',
+      monitorId: 2,
+      at: { x: 220, y: 920 },
+      size: { width: 200, height: 100 },
+    })
+    const toHdmi = reduceSession(
+      first.state,
+      desktop({
+        focusedAddress: code.address,
+        windows: [code],
+        monitors: [monitor(), hdmi, dell],
+      }),
+      options({ privacyRegion: slot }),
+      10,
+    )
+    const jumped = reduceSession(
+      toHdmi.state,
+      desktop({
+        focusedAddress: mail.address,
+        windows: [mail],
+        monitors: [monitor(), hdmi, dell],
+      }),
+      options({ privacyRegion: slot }),
+      10 + MONITOR_SLIDE_MS,
+    )
+    expect(jumped.command).toBe("--region '200,900 1920x1080 DP-3'")
+    expect(jumped.state.last).toMatchObject({ kind: 'follow', address: '0xmail' })
+    expect(jumped.state.pendingFollow).toBeNull()
   })
 })

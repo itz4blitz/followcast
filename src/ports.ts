@@ -16,7 +16,7 @@ type ClockPort = {
   now?(): number
 }
 
-export type SlideCard = {
+type SlideCard = {
   readonly kind: 'slide'
   readonly direction: 'left' | 'right' | 'up' | 'down'
   readonly fromLabel: string

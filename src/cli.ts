@@ -59,7 +59,9 @@ const code = await buildCliMain({
           },
           spawn: (command, args) => {
             const argv =
-              command === 'wl-mirror' ? (['python3', cardScript] as const) : ([command, ...args] as const)
+              command === 'wl-mirror'
+                ? (['python3', cardScript] as const)
+                : ([command, ...args] as const)
             const child = spawn(argv[0], [...argv.slice(1)], {
               stdio: ['pipe', 'ignore', 'inherit'],
             })
