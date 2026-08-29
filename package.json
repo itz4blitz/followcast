@@ -1,6 +1,6 @@
 {
   "name": "followcast",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "description": "Share one Followcast window. It always shows the Hyprland keyboard-focused app, even on another monitor.",
   "license": "Apache-2.0",

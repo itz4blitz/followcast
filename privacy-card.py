@@ -9,6 +9,8 @@ import signal
 import subprocess
 import sys
 import threading
+import time
+from queue import Queue
 from pathlib import Path
 
 from capture_argv import (
@@ -60,6 +62,9 @@ class FollowcastWindow(Gtk.ApplicationWindow):
         self._slide_key = initial_slide_key()
         self._clock_held = False
         self._frame_n = 0
+        self._capture_output: str | None = None
+        self._capture_lock = threading.Lock()
+        self._frames: Queue[bytes] = Queue(maxsize=2)
         self.live = shot_view()
         privacy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         privacy.set_valign(Gtk.Align.CENTER)
@@ -105,6 +110,7 @@ class FollowcastWindow(Gtk.ApplicationWindow):
         GLib.idle_add(self._hold_frame_clock)
         GLib.timeout_add(80, self.tick)
         threading.Thread(target=self._read_stdin, daemon=True).start()
+        threading.Thread(target=self._capture_loop, daemon=True).start()
 
     def _refuse_close(self, _window: Gtk.Window) -> bool:
         return True
@@ -117,7 +123,9 @@ class FollowcastWindow(Gtk.ApplicationWindow):
             GLib.idle_add(self._set_output, output)
 
     def _set_output(self, output: str) -> bool:
-        self.output = output
+        with self._capture_lock:
+            self.output = output
+            self._capture_output = output
         return False
 
     def tick(self) -> bool:
@@ -142,7 +150,6 @@ class FollowcastWindow(Gtk.ApplicationWindow):
             return True
         self._slide_key = ""
         self.set_child(self.live)
-        self._grab()
         self._kick_render()
         return True
 
@@ -158,13 +165,20 @@ class FollowcastWindow(Gtk.ApplicationWindow):
             self.output = dest
         self._slide_key = key
         self.set_child(self.live)
-        self._grab()
 
     def _grab(self) -> None:
         if self.output is None:
             return
-        path = self._grab_to_file(self.output)
-        if path is None:
+        try:
+            png = self._frames.get_nowait()
+        except Exception:
+            return
+        folder = state_path().parent
+        self._frame_n += 1
+        path = folder / f"live-{self._frame_n % 2}.png"
+        try:
+            path.write_bytes(png)
+        except OSError:
             return
         # Load the texture synchronously before asking Wayland to commit. An
         # asynchronous set_filename can leave the share-picker snapshot blank.
@@ -173,6 +187,27 @@ class FollowcastWindow(Gtk.ApplicationWindow):
         except GLib.Error:
             return
         show_texture(self.live, texture)
+        self._kick_render()
+
+    def _capture_loop(self) -> None:
+        while True:
+            with self._capture_lock:
+                output = self._capture_output
+            if output is not None:
+                try:
+                    png = subprocess.check_output(grim_live_argv(output), timeout=1.0)
+                    try:
+                        self._frames.put_nowait(png)
+                    except Exception:
+                        try:
+                            self._frames.get_nowait()
+                            self._frames.put_nowait(png)
+                        except Exception:
+                            pass
+                    GLib.idle_add(self._grab)
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    pass
+            time.sleep(0.08)
 
     def _hold_frame_clock(self) -> bool:
         # Parked unfocused surfaces stop the GTK frame clock, so queue_draw never commits.
