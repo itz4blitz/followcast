@@ -19,6 +19,7 @@ export type RuntimeDeps = {
   readonly schedule: Schedule
   readonly tickMs: number
   readonly signal: AbortSignal
+  readonly surfaceScript: string
 }
 
 export type RuntimeIo = {
@@ -27,6 +28,7 @@ export type RuntimeIo = {
   readonly connect: (path: string) => { readonly readable: AsyncIterable<string> }
   readonly exists: (path: string) => boolean
   readonly pathEnv: string | undefined
+  readonly surfaceScript: string
 }
 
 export function createRuntimePorts(env: HyprlandEnv, deps: RuntimeDeps): FollowcastPorts {
@@ -38,6 +40,7 @@ export function createRuntimePorts(env: HyprlandEnv, deps: RuntimeDeps): Followc
     mirror: createMirrorPort({
       which: deps.which,
       spawn: deps.spawn,
+      surfaceScript: deps.surfaceScript,
     }),
     clock: {
       ticks: intervalTicks(deps.tickMs, deps.signal, deps.schedule),
@@ -54,5 +57,6 @@ export function runtimeDepsFromIo(io: RuntimeIo, signal: AbortSignal): RuntimeDe
     schedule: nodeSchedule,
     tickMs: GEOMETRY_TICK_MS,
     signal,
+    surfaceScript: io.surfaceScript,
   }
 }

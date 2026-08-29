@@ -1,4 +1,4 @@
-import { monitorToRegion, windowToRegion } from './geometry.ts'
+import { monitorToRegion } from './geometry.ts'
 import { isAppAllowed, isMonitorAllowed } from './policy.ts'
 import { isShareableOutput } from './shareableOutput.ts'
 import type {
@@ -70,9 +70,6 @@ export function decideFollow(snapshot: DesktopSnapshot, options: FollowOptions):
       monitorName: host.name,
       reason: 'app-off',
     }
-  }
-  if (windowToRegion(focused, host) === null) {
-    return { kind: 'hold', reason: 'empty-region' }
   }
   return { kind: 'follow', address: focused.address, region: monitorToRegion(host) }
 }

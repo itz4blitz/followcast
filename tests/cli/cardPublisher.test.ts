@@ -34,6 +34,14 @@ describe('filePrivacyCard', () => {
     })
   })
 
+  it('creates the runtime directory when the first publish is a hide', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'followcast-'))
+    expect(existsSync(cardStatePath(dir))).toBe(false)
+    filePrivacyCard(dir).publish(null)
+    expect(JSON.parse(readFileSync(cardStatePath(dir), 'utf8'))).toEqual({ visible: false })
+    expect(existsSync(`${cardStatePath(dir)}.tmp`)).toBe(false)
+  })
+
   it('marks the card hidden when publish is cleared', () => {
     const dir = mkdtempSync(join(tmpdir(), 'followcast-'))
     const card = filePrivacyCard(dir)

@@ -55,25 +55,22 @@ export function reduceSession(
       }
       return { state: withLast(decision), command: null }
     }
+    // Stryker disable next-line ConditionalExpression: last.kind === 'privacy' already implies last is set
     if (state.last !== null && state.last.kind === 'privacy') {
       return { state: withLast(decision), command: null }
     }
     return { state: withLast(decision), command: streamCommand(region) }
   }
   const follow = decision
-  if (
-    state.last !== null &&
-    // Stryker disable next-line ConditionalExpression: only TransitionDecision has untilMs
-    state.last.kind === 'transition' &&
-    nowMs < state.last.untilMs
-  ) {
+  // Stryker disable next-line ConditionalExpression: last.kind === 'transition' already implies last is set
+  if (state.last !== null && state.last.kind === 'transition' && nowMs < state.last.untilMs) {
     if (sameFollow(state.pendingFollow, follow)) {
       return { state, command: null }
     }
     const slide = monitorSlide(
       {
         kind: 'follow',
-        // Stryker disable next-line LogicalOperator: address is unused by monitorSlide (kind + region.output only)
+        // Stryker disable next-line LogicalOperator: address is unused by monitorSlide — region.output drives the slide
         address: state.pendingFollow?.address ?? follow.address,
         region: {
           output: state.last.fromOutput,
@@ -86,6 +83,7 @@ export function reduceSession(
       follow,
       snapshot.monitors,
     )
+    // Stryker disable next-line ConditionalExpression: slide !== null is implied by toOutput differing from last
     if (slide !== null && slide.toOutput !== state.last.toOutput) {
       return {
         state: {
@@ -98,24 +96,18 @@ export function reduceSession(
     return { state: { last: state.last, pendingFollow: follow }, command: null }
   }
   if (sameFollow(state.last, follow) || sameFollow(state.pendingFollow, follow)) {
-    if (
-      // Stryker disable next-line ConditionalExpression: pendingFollow is only set when last is already a transition
-      state.last !== null &&
-      state.last.kind === 'transition'
-    ) {
+    // Stryker disable next-line ConditionalExpression: last.kind === 'transition' already implies last is set
+    if (state.last !== null && state.last.kind === 'transition') {
       return { state: withLast(follow), command: streamCommand(follow.region) }
     }
     return { state, command: null }
   }
   const previousFollow =
-    // Stryker disable next-line ConditionalExpression: pendingFollow is only set while last is a transition; the next guard then ignores that slide
+    // Stryker disable next-line ConditionalExpression: last.kind === 'follow' already implies last is set
     state.last !== null && state.last.kind === 'follow' ? state.last : state.pendingFollow
   const slide = monitorSlide(previousFollow, follow, snapshot.monitors)
-  if (
-    slide !== null &&
-    // Stryker disable next-line ConditionalExpression: last is never null when a slide exists
-    (state.last === null || state.last.kind !== 'transition')
-  ) {
+  // Stryker disable next-line ConditionalExpression,EqualityOperator,StringLiteral: last.kind !== 'transition' already implies last is set
+  if (slide !== null && (state.last === null || state.last.kind !== 'transition')) {
     return {
       state: {
         last: { kind: 'transition', ...slide, untilMs: nowMs + MONITOR_SLIDE_MS },

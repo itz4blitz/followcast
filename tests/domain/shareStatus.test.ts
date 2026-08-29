@@ -43,8 +43,8 @@ describe('shareStatus', () => {
   it('skips Followcast surfaces in the app list', () => {
     const card = windowSnap({
       address: '0xcard',
-      className: 'followcast-privacy',
-      title: 'Followcast Privacy',
+      className: 'followcast.surface',
+      title: 'Followcast',
     })
     const mirror = windowSnap({
       address: '0xself',

@@ -1,33 +1,12 @@
-import { windowToRegion } from './geometry.ts'
-import { shareableMonitors } from './shareableOutput.ts'
-import type { DesktopSnapshot, FollowRegion, MonitorSnapshot, WindowSnapshot } from './types.ts'
+import { orderShareableMonitors } from './shareableOutput.ts'
+import type { FollowRegion, MonitorSnapshot } from './types.ts'
 
 const SLOT_WIDTH = 480
 const SLOT_HEIGHT = 270
 const SLOT_MARGIN = 16
 
-function isPrivacyWindow(window: WindowSnapshot): boolean {
-  return window.className === 'followcast-privacy' || window.title.includes('Followcast Privacy')
-}
-
-export function findPrivacyWindow(windows: readonly WindowSnapshot[]): WindowSnapshot | undefined {
-  return windows.find((window) => isPrivacyWindow(window) && window.mapped && !window.hidden)
-}
-
-export function privacyRegionFrom(snapshot: DesktopSnapshot): FollowRegion | null {
-  const card = findPrivacyWindow(snapshot.windows)
-  if (card === undefined) {
-    return null
-  }
-  const host = snapshot.monitors.find((monitor) => monitor.id === card.monitorId)
-  if (host === undefined) {
-    return null
-  }
-  return windowToRegion(card, host)
-}
-
 export function privacySlotRegion(monitors: readonly MonitorSnapshot[]): FollowRegion | null {
-  const host = shareableMonitors(monitors).at(-1)
+  const host = orderShareableMonitors(monitors).at(-1)
   if (host === undefined) {
     return null
   }

@@ -1,8 +1,7 @@
 import { initialOutput } from '../domain/initialOutput.ts'
-import { parkPoint, surfaceWindow } from '../domain/park.ts'
-import { privacyRegionFrom, privacySlotRegion } from '../domain/privacyWindow.ts'
+import { privacySlotRegion } from '../domain/privacyWindow.ts'
 import { reduceSession } from '../domain/session.ts'
-import type { DesktopSnapshot, FollowOptions, SessionState } from '../domain/types.ts'
+import type { FollowOptions, SessionState } from '../domain/types.ts'
 import { classifyEvent } from '../hyprland/events.ts'
 import { toDesktopSnapshot } from '../hyprland/parse.ts'
 import type { FollowcastPorts } from '../ports.ts'
@@ -48,7 +47,6 @@ async function run(
 ): Promise<void> {
   let started = false
   let state: SessionState = { last: null, pendingFollow: null }
-  const parkMemo = { key: '' }
   try {
     const first = toDesktopSnapshot(
       await ports.hyprland.clients(),
@@ -59,7 +57,6 @@ async function run(
     await ports.mirror.start(output)
     started = true
     state = apply(state, first, resolveOptions(options), ports)
-    await parkSurface(ports, first, resolveOptions(options), parkMemo)
     ready.resolve()
     await Promise.race([
       waitForAbort(signal),
@@ -71,7 +68,6 @@ async function run(
         (next) => {
           state = next
         },
-        parkMemo,
       ),
       consumeTicks(
         ports,
@@ -81,7 +77,6 @@ async function run(
         (next) => {
           state = next
         },
-        parkMemo,
       ),
     ])
   } catch (error) {
@@ -106,7 +101,7 @@ function apply(
     snapshot,
     {
       ...options,
-      privacyRegion: privacyRegionFrom(snapshot) ?? privacySlotRegion(snapshot.monitors),
+      privacyRegion: privacySlotRegion(snapshot.monitors),
     },
     nowMs,
   )
@@ -120,7 +115,7 @@ function apply(
     if (last !== null && last.kind === 'privacy') {
       card.publish({ appLabel: last.appLabel })
     } else if (
-      // Stryker disable next-line ConditionalExpression: equivalent — reduceSession always leaves last set
+      // Stryker disable next-line ConditionalExpression: equivalent — last.kind === 'transition' already implies last is set
       last !== null &&
       last.kind === 'transition'
     ) {
@@ -139,51 +134,23 @@ function apply(
   return step.state
 }
 
-async function parkSurface(
-  ports: FollowcastPorts,
-  snapshot: DesktopSnapshot,
-  options: FollowOptions,
-  memo: { key: string },
-): Promise<void> {
-  const surface = surfaceWindow(snapshot.windows, options.selfClasses)
-  const park = parkPoint(snapshot.monitors)
-  if (surface === undefined || park === null) {
-    return
-  }
-  if (surface.at.x === park.x && surface.at.y === park.y) {
-    memo.key = ''
-    return
-  }
-  const key = `${surface.address}:${park.x}:${park.y}`
-  if (memo.key === key) {
-    return
-  }
-  memo.key = key
-  try {
-    await ports.hyprland.moveWindow(surface.address, park.x, park.y)
-  } catch {
-    memo.key = ''
-  }
-}
-
 async function refresh(
   ports: FollowcastPorts,
   options: FollowOptionsSource,
   signal: AbortSignal,
   readState: () => SessionState,
   writeState: (state: SessionState) => void,
-  parkMemo: { key: string },
 ): Promise<void> {
   const snapshot = toDesktopSnapshot(
     await ports.hyprland.clients(),
     await ports.hyprland.monitors(),
     await ports.hyprland.activeWindow(),
   )
+  // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — consumeEvents/Ticks also return when aborted
   if (signal.aborted) {
     return
   }
   writeState(apply(readState(), snapshot, resolveOptions(options), ports))
-  await parkSurface(ports, snapshot, resolveOptions(options), parkMemo)
 }
 
 async function consumeEvents(
@@ -192,7 +159,6 @@ async function consumeEvents(
   signal: AbortSignal,
   readState: () => SessionState,
   writeState: (state: SessionState) => void,
-  parkMemo: { key: string },
 ): Promise<void> {
   for await (const line of ports.hyprland.events()) {
     // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — refresh() also returns when aborted
@@ -202,7 +168,7 @@ async function consumeEvents(
     if (classifyEvent(line) === 'ignore') {
       continue
     }
-    await refresh(ports, options, signal, readState, writeState, parkMemo)
+    await refresh(ports, options, signal, readState, writeState)
   }
 }
 
@@ -212,14 +178,13 @@ async function consumeTicks(
   signal: AbortSignal,
   readState: () => SessionState,
   writeState: (state: SessionState) => void,
-  parkMemo: { key: string },
 ): Promise<void> {
   for await (const _tick of ports.clock.ticks) {
     // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — refresh() also returns when aborted
     if (signal.aborted) {
       return
     }
-    await refresh(ports, options, signal, readState, writeState, parkMemo)
+    await refresh(ports, options, signal, readState, writeState)
   }
 }
 

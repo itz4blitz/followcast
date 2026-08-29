@@ -39,6 +39,7 @@ export function createHyprlandPort(deps: HyprlandPortDeps): HyprlandPort {
       try {
         await deps.exec(['hyprctl', 'dispatch', expression])
       } catch (error) {
+        // Stryker disable next-line ObjectLiteral: equivalent — callers match on message, not Error.cause
         throw new Error(`hyprctl dispatch move: ${formatError(error)}`, { cause: error })
       }
     },

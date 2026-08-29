@@ -199,7 +199,7 @@ describe('decideFollow', () => {
     ).toEqual({ kind: 'hold', reason: 'no-monitor' })
   })
 
-  it('holds when the window-monitor intersection is empty', () => {
+  it('follows the focused output even when the window box misses the monitor', () => {
     const off = windowSnap({
       address: '0xoff',
       at: { x: 9000, y: 0 },
@@ -207,7 +207,11 @@ describe('decideFollow', () => {
     })
     expect(
       decideFollow(desktop({ focusedAddress: off.address, windows: [off] }), options()),
-    ).toEqual({ kind: 'hold', reason: 'empty-region' })
+    ).toEqual({
+      kind: 'follow',
+      address: '0xoff',
+      region: { output: 'DP-1', x: 0, y: 0, width: 1600, height: 900 },
+    })
   })
 
   it('follows a window on a second monitor when keyboard focus lands there', () => {

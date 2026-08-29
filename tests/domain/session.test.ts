@@ -116,7 +116,7 @@ describe('reduceSession', () => {
     expect(next.state.last).toEqual({ kind: 'hold', reason: 'unmapped' })
   })
 
-  it('points wl-mirror at the privacy card when an app is toggled off', () => {
+  it('points the share surface at the privacy slot when an app is toggled off', () => {
     const card = { output: 'DP-1', x: 20, y: 30, width: 640, height: 360 }
     const slack = windowSnap({ address: '0xslack', className: 'slack', title: 'Slack' })
     const step = reduceSession(

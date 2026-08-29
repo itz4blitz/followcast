@@ -33,5 +33,28 @@ def destination_output(slide: dict[str, object]) -> str | None:
     return to_output
 
 
+def initial_slide_key() -> str:
+    return ""
+
+
+def stdin_line_iter(fd: int):
+    """Read stdin line-buffered. A pipe's default 8KiB block buffer would stall retargets."""
+    import os
+
+    with os.fdopen(fd, "r", buffering=1, closefd=False) as handle:
+        while True:
+            line = handle.readline()
+            if line == "":
+                return
+            yield line
+
+
+def native_pixel_size(surface_width: int, surface_height: int) -> tuple[int, int]:
+    """Scale grim into the Wayland buffer so GDK_SCALE=1 cannot leave a neighbor strip."""
+    if surface_width < 1 or surface_height < 1:
+        return (1280, 720)
+    return (surface_width, surface_height)
+
+
 def grim_live_argv(output: str) -> list[str]:
     return ["grim", "-o", output, "-"]

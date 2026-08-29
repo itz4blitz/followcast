@@ -39,6 +39,20 @@ describe('slideDirection', () => {
     expect(slideDirection(inset, wide)).toBe('right')
   })
 
+  it('uses Hyprland global layout pixels regardless of scale', () => {
+    const left = monitor({ name: 'A', x: 0, y: 0, width: 1000, height: 100, scale: 1 })
+    const right = monitor({ name: 'B', x: 600, y: 0, width: 100, height: 100, scale: 1 })
+    expect(slideDirection(left, right)).toBe('right')
+    const hidpi = monitor({ name: 'HIDPI', x: 100, y: 0, width: 1000, height: 100, scale: 10 })
+    expect(slideDirection(left, hidpi)).toBe('right')
+  })
+
+  it('adds half the logical height so a short monitor below a tall one is still down', () => {
+    const tall = monitor({ name: 'TALL', x: 0, y: 0, width: 100, height: 1000, scale: 1 })
+    const short = monitor({ name: 'SHORT', x: 0, y: 100, width: 100, height: 100, scale: 1 })
+    expect(slideDirection(tall, short)).toBe('up')
+  })
+
   it('treats an equal horizontal and vertical offset as horizontal', () => {
     const origin = monitor({ name: 'A', x: 0, y: 0, width: 100, height: 100, scale: 1 })
     const diagonal = monitor({ name: 'B', x: 400, y: 400, width: 100, height: 100, scale: 1 })
@@ -96,6 +110,11 @@ describe('monitorSlide', () => {
     kind: 'follow' as const,
     address: '0x1',
     region: { output, x: 0, y: 0, width: 10, height: 10 },
+  })
+
+  it('returns null when either output is missing from the layout', () => {
+    expect(monitorSlide(follow('DP-1'), follow('GONE'), [dp1])).toBeNull()
+    expect(monitorSlide(follow('GONE'), follow('DP-1'), [dp1])).toBeNull()
   })
 
   it('describes a rightward move from DP-1 onto HDMI', () => {

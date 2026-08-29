@@ -31,12 +31,7 @@ export function windowSnap(overrides: Partial<WindowSnapshot> = {}): WindowSnaps
 
 export function options(overrides: Partial<FollowOptions> = {}): FollowOptions {
   return {
-    selfClasses: [
-      'at.yrlf.wl_mirror',
-      'followcast-privacy',
-      'followcast.privacy',
-      'followcast.surface',
-    ],
+    selfClasses: ['followcast.surface', 'at.yrlf.wl_mirror'],
     selfTitleIncludes: [],
     denyClasses: [],
     policy: DEFAULT_POLICY,

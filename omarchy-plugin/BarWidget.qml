@@ -8,8 +8,8 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "followcast"
-  ipcTarget: "followcast"
+  moduleName: "blitz.followcast"
+  ipcTarget: "blitz.followcast"
 
   property bool ready: false
   property bool sharing: false
@@ -218,10 +218,7 @@ Panel {
   function dashIconUrl(className) {
     var hit = root.catalogHit(className)
     if (hit && String(hit.icon || "").indexOf("https://") === 0) return hit.icon
-    var name = root.displayNameForClass(className).toLowerCase()
-    var slug = name.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-    if (!slug) return ""
-    return "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/" + slug + ".png"
+    return ""
   }
 
   function themeIconForClass(className) {

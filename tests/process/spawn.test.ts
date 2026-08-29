@@ -6,8 +6,8 @@ describe('createNodeSpawn', () => {
     const writes: string[] = []
     let killed = false
     const spawn = createNodeSpawn((command, args) => {
-      expect(command).toBe('wl-mirror')
-      expect(args[0]).toBe('--stream')
+      expect(command).toBe('python3')
+      expect(args[0]).toBe('/opt/followcast/privacy-card.py')
       return {
         stdin: {
           write: (chunk: string) => {
@@ -19,7 +19,7 @@ describe('createNodeSpawn', () => {
         },
       }
     })
-    const child = spawn(['wl-mirror', '--stream', 'DP-1'])
+    const child = spawn(['python3', '/opt/followcast/privacy-card.py'])
     child.write('--freeze')
     child.kill()
     expect(writes).toEqual(['--freeze\n'])

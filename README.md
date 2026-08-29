@@ -17,22 +17,18 @@ card instead of the real window.
 Followcast is **not** on the npm registry. Install the CLI tarball from a
 [GitHub Release](https://github.com/itz4blitz/followcast/releases).
 
-Needs Node 20+ plus `wl-mirror`, `python-gobject`, `gtk4`, and `gtk4-layer-shell`.
+Needs Node 20+ and `grim` + `python-gobject` + `gtk4`.
 
 ```bash
-pacman -S wl-mirror python-gobject gtk4 gtk4-layer-shell
+pacman -S grim python-gobject gtk4
 gh release download --repo itz4blitz/followcast --pattern 'followcast-*.tgz'
 npm install -g ./followcast-*.tgz
 ```
 
-Without `gh`, pin the current asset:
+`npm install -g` puts `followcast` on your PATH. The unreleased tree in this
+checkout paints a GTK4 window from `grim` captures of the focused output.
 
-```bash
-npm install -g https://github.com/itz4blitz/followcast/releases/download/v0.2.0/followcast-0.2.0.tgz
-```
-
-`npm install -g` puts `followcast` on your PATH.
-Add to `~/.config/hypr/hyprland.lua`:
+Add the source rule to `~/.config/hypr/hyprland.lua`:
 
 ```lua
 -- One mapped source window on a headless output. Discord/Meet can capture it,
@@ -49,13 +45,15 @@ o.window({ title = "^Followcast$" }, {
   no_focus = true,
   no_follow_mouse = true,
   render_unfocused = true,
+  tag = "-default-opacity",
+  opacity = "1 1",
   size = { 1280, 720 },
   move = { 0, 0 },
 })
 ```
 
-Do **not** add a window rule for a Followcast Privacy app. The blocked
-card is a layer-shell overlay, not a shareable window.
+Muted apps paint the **Hidden by Followcast** page inside that same
+window. Do not add a second Followcast Privacy window rule.
 
 Then `hyprctl reload`.
 
@@ -63,7 +61,8 @@ Run it at login so the **Followcast** window is already in the share picker:
 
 ```lua
 -- ~/.config/hypr/autostart.lua
-o.launch_on_start("followcast")
+o.exec_on_start("sh -c 'sleep 1 && hyprctl output create headless fc-dummy'")
+o.exec_on_start("sh -c 'sleep 2 && followcast'")
 ```
 
 Or start it by hand:
@@ -95,14 +94,9 @@ followcast policy set-app slack off
 followcast status
 ```
 
-On Omarchy, install the bar chip from
-[blitz.followcast](https://github.com/itz4blitz/blitz.followcast):
-
-```bash
-omarchy plugin add https://github.com/itz4blitz/blitz.followcast.git --enable
-```
-
-The chip calls `followcast status` / `followcast policy`.
+On Omarchy, copy `omarchy-plugin/` to `~/.config/omarchy/plugins/blitz.followcast`
+and add `blitz.followcast` to the bar in `~/.config/omarchy/shell.json`. The chip
+calls `followcast status` / `followcast policy`.
 
 You should not see a Followcast app window. The dummy is mapped on the
 headless `fc-dummy` output so Discord can capture it without exposing it on
@@ -120,8 +114,6 @@ app. Hyprland group members are separate apps.
 ## Develop
 
 ```bash
-git clone https://github.com/itz4blitz/followcast.git
-cd followcast
 npm install
 npm run build
 npm link

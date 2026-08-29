@@ -28,17 +28,6 @@ const fox = {
   title: 'Mozilla Firefox',
 }
 
-const card = {
-  address: '0xcard',
-  mapped: true,
-  hidden: false,
-  at: [40, 50],
-  size: [640, 360],
-  monitor: 0,
-  class: 'followcast-privacy',
-  title: 'Followcast Privacy',
-}
-
 function fakePorts(): {
   ports: FollowcastPorts
   events: AsyncQueue<string>
@@ -175,7 +164,7 @@ describe('buildCliMain', () => {
       },
       createPorts: () => ({
         hyprland: {
-          clients: async () => [fox, card],
+          clients: async () => [fox],
           monitors: async () => [dp1],
           activeWindow: async () => ({ address: '0xfox' }),
           events: () => events,

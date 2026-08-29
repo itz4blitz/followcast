@@ -35,11 +35,11 @@ const dp3 = monitor({
 
 describe('parkPoint', () => {
   it('parks two logical pixels onto the bottom-right of the lowest display', () => {
-    expect(parkPoint([dp1, hdmi, dp3])).toEqual({ x: 1638, y: 1708 })
+    expect(parkPoint([dp1, hdmi, dp3])).toEqual({ x: 2118, y: 1978 })
   })
 
   it('breaks row ties by picking the right-most display', () => {
-    expect(parkPoint([dp1, hdmi])).toEqual({ x: 3198, y: 898 })
+    expect(parkPoint([dp1, hdmi])).toEqual({ x: 4158, y: 1438 })
   })
 
   it('ignores headless outputs when choosing the parking display', () => {
@@ -51,7 +51,7 @@ describe('parkPoint', () => {
       width: 3840,
       height: 2160,
     })
-    expect(parkPoint([dp1, headless])).toEqual({ x: 1598, y: 898 })
+    expect(parkPoint([dp1, headless])).toEqual({ x: 2558, y: 1438 })
   })
 
   it('returns null when no shareable display exists', () => {

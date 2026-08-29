@@ -47,19 +47,14 @@ export type FollowOptions = {
 }
 
 export const DEFAULT_FOLLOW_OPTIONS: FollowOptions = {
-  selfClasses: [
-    'at.yrlf.wl_mirror',
-    'followcast-privacy',
-    'followcast.privacy',
-    'followcast.surface',
-  ],
+  selfClasses: ['followcast.surface', 'at.yrlf.wl_mirror'],
   selfTitleIncludes: [],
   denyClasses: [],
   policy: DEFAULT_POLICY,
   privacyRegion: null,
 }
 
-type HoldReason = 'self' | 'denylist' | 'unmapped' | 'missing' | 'no-monitor' | 'empty-region'
+type HoldReason = 'self' | 'unmapped' | 'missing' | 'no-monitor'
 
 type PrivacyReason = 'monitor-off' | 'app-off'
 

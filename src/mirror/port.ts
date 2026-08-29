@@ -5,22 +5,14 @@ export type SpawnedMirror = {
   kill(): void
 }
 
+export function dummySurfaceArgv(script: string): string[] {
+  return ['python3', '-u', script]
+}
+
 export type MirrorPortDeps = {
   which(binary: string): string | null
   spawn(argv: readonly string[]): SpawnedMirror
-}
-
-export function wlMirrorArgv(output: string): string[] {
-  return [
-    'wl-mirror',
-    '--stream',
-    '--title',
-    'Followcast',
-    '--show-cursor',
-    '--scaling',
-    'fit',
-    output,
-  ]
+  surfaceScript: string
 }
 
 export function createMirrorPort(deps: MirrorPortDeps): MirrorPort {
@@ -30,7 +22,7 @@ export function createMirrorPort(deps: MirrorPortDeps): MirrorPort {
       if (deps.which('grim') === null) {
         throw new Error('grim is not installed; pacman -S grim')
       }
-      child = deps.spawn(wlMirrorArgv(output))
+      child = deps.spawn(dummySurfaceArgv(deps.surfaceScript))
       child.write(`--output '${output}'`)
     },
     send: (line: string) => {

@@ -58,23 +58,6 @@ const selfMirror = {
   title: 'Followcast',
 }
 
-const surface = {
-  address: '0xsurface',
-  mapped: true,
-  hidden: false,
-  at: [1400, 750],
-  size: [1280, 720],
-  monitor: 1,
-  class: 'followcast.surface',
-  title: 'Followcast',
-}
-
-type Move = {
-  address: string
-  x: number
-  y: number
-}
-
 type World = {
   clients: unknown[]
   monitors: unknown[]
@@ -84,7 +67,6 @@ type World = {
   started: string[]
   sent: string[]
   stops: number
-  moves: Move[]
   now: number
 }
 
@@ -98,7 +80,6 @@ function world(seed: Partial<World> = {}): World {
     started: [],
     sent: [],
     stops: 0,
-    moves: [],
     now: 0,
     ...seed,
   }
@@ -111,9 +92,7 @@ function portsOf(w: World) {
       monitors: async () => w.monitors,
       activeWindow: async () => w.active,
       events: () => w.events,
-      moveWindow: async (address: string, x: number, y: number) => {
-        w.moves.push({ address, x, y })
-      },
+      moveWindow: async () => {},
     },
     mirror: {
       start: async (output: string) => {
@@ -157,7 +136,7 @@ async function shutdown(
 }
 
 describe('runFollowcast', () => {
-  it('starts wl-mirror on the focused monitor and shares the focused app', async () => {
+  it('starts the share surface on the focused monitor and shares the focused app', async () => {
     const w = world()
     const controller = new AbortController()
     const handle = startFollowcast(portsOf(w), options(), controller.signal)
@@ -551,91 +530,5 @@ describe('runFollowcast', () => {
     ).rejects.toThrow(/no monitor/)
     expect(w.started).toEqual([])
     expect(w.stops).toBe(0)
-  })
-})
-
-describe('surface parking', () => {
-  it('parks a drifted surface window off the bottom-right corner', async () => {
-    const w = world({ clients: [fox, surface] })
-    const controller = new AbortController()
-    const handle = startFollowcast(portsOf(w), options(), controller.signal)
-    await handle.ready
-    await waitUntil(() => w.moves.length === 1)
-    expect(w.moves[0]).toEqual({ address: '0xsurface', x: 5118, y: 1438 })
-    await shutdown(controller, w, handle.finished)
-  })
-
-  it('does not move a surface window that is already parked', async () => {
-    const parked = { ...surface, at: [5118, 1438] }
-    const w = world({ clients: [fox, parked] })
-    const controller = new AbortController()
-    const handle = startFollowcast(portsOf(w), options(), controller.signal)
-    await handle.ready
-    w.ticks.push(undefined)
-    await new Promise<void>((resolve) => {
-      setImmediate(resolve)
-    })
-    expect(w.moves).toEqual([])
-    await shutdown(controller, w, handle.finished)
-  })
-
-  it('re-parks when the display layout changes', async () => {
-    const parked = { ...surface, at: [5118, 1438] }
-    const w = world({ clients: [fox, parked] })
-    const controller = new AbortController()
-    const handle = startFollowcast(portsOf(w), options(), controller.signal)
-    await handle.ready
-    expect(w.moves).toEqual([])
-    w.monitors = [dp1]
-    w.ticks.push(undefined)
-    await waitUntil(() => w.moves.length === 1)
-    expect(w.moves[0]).toEqual({ address: '0xsurface', x: 2558, y: 1438 })
-    await shutdown(controller, w, handle.finished)
-  })
-
-  it('keeps running when the move dispatch fails', async () => {
-    const w = world({ clients: [fox, surface] })
-    const controller = new AbortController()
-    const ports = portsOf(w)
-    const hyprland = {
-      ...ports.hyprland,
-      moveWindow: async () => {
-        throw new Error('dispatch failed')
-      },
-    }
-    const handle = startFollowcast({ ...ports, hyprland }, options(), controller.signal)
-    await handle.ready
-    w.ticks.push(undefined)
-    await new Promise<void>((resolve) => {
-      setImmediate(resolve)
-    })
-    expect(w.sent.length).toBeGreaterThan(0)
-    await shutdown(controller, w, handle.finished)
-    expect(w.stops).toBe(1)
-  })
-
-  it('retries the park after a failed dispatch', async () => {
-    const w = world({ clients: [fox, surface] })
-    const controller = new AbortController()
-    const ports = portsOf(w)
-    let failures = 0
-    const moves: Move[] = []
-    const hyprland = {
-      ...ports.hyprland,
-      moveWindow: async (address: string, x: number, y: number) => {
-        if (failures < 1) {
-          failures += 1
-          throw new Error('dispatch failed')
-        }
-        moves.push({ address, x, y })
-      },
-    }
-    const handle = startFollowcast({ ...ports, hyprland }, options(), controller.signal)
-    await handle.ready
-    await waitUntil(() => failures === 1)
-    w.ticks.push(undefined)
-    await waitUntil(() => moves.length === 1)
-    expect(moves[0]).toEqual({ address: '0xsurface', x: 5118, y: 1438 })
-    await shutdown(controller, w, handle.finished)
   })
 })

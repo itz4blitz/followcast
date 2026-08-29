@@ -1,18 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createMirrorPort, wlMirrorArgv } from '../../src/mirror/port.ts'
+import { createMirrorPort, dummySurfaceArgv } from '../../src/mirror/port.ts'
 
-describe('wlMirrorArgv', () => {
-  it('starts a titled stream window on the given output', () => {
-    expect(wlMirrorArgv('HDMI-A-1')).toEqual([
-      'wl-mirror',
-      '--stream',
-      '--title',
-      'Followcast',
-      '--show-cursor',
-      '--scaling',
-      'fit',
-      'HDMI-A-1',
-    ])
+const CARD = '/opt/followcast/privacy-card.py'
+
+describe('dummySurfaceArgv', () => {
+  it('starts the GTK share surface by script path', () => {
+    expect(dummySurfaceArgv(CARD)).toEqual(['python3', '-u', CARD])
   })
 })
 
@@ -23,6 +16,7 @@ describe('createMirrorPort', () => {
       spawn: () => {
         throw new Error('should not spawn')
       },
+      surfaceScript: CARD,
     })
     await expect(port.start('DP-1')).rejects.toThrow(/grim/)
   })
@@ -31,13 +25,14 @@ describe('createMirrorPort', () => {
     const writes: string[] = []
     let killed = false
     const asked: string[] = []
+    const spawned: string[][] = []
     const port = createMirrorPort({
       which: (binary) => {
         asked.push(binary)
         return binary === 'grim' ? '/usr/bin/grim' : null
       },
       spawn: (argv) => {
-        expect(argv[0]).toBe('wl-mirror')
+        spawned.push([...argv])
         return {
           write: (line) => {
             writes.push(line)
@@ -47,9 +42,11 @@ describe('createMirrorPort', () => {
           },
         }
       },
+      surfaceScript: CARD,
     })
     await port.start('DP-1')
     expect(asked).toEqual(['grim'])
+    expect(spawned).toEqual([['python3', '-u', CARD]])
     expect(writes).toEqual(["--output 'DP-1'"])
     port.send("--output 'HDMI-A-1'")
     expect(writes).toEqual(["--output 'DP-1'", "--output 'HDMI-A-1'"])
@@ -63,6 +60,7 @@ describe('createMirrorPort', () => {
       spawn: () => {
         throw new Error('should not spawn')
       },
+      surfaceScript: CARD,
     })
     await expect(port.stop()).resolves.toBeUndefined()
     port.send('ignored')

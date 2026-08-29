@@ -10,12 +10,14 @@ describe('runtimeDepsFromIo', () => {
           throw new Error('unused')
         },
         connect: () => ({ readable: (async function* () {})() }),
-        exists: (path) => path === '/usr/bin/wl-mirror',
+        exists: (path) => path === '/usr/bin/grim',
         pathEnv: '/usr/bin',
+        surfaceScript: '/opt/followcast/privacy-card.py',
       },
       new AbortController().signal,
     )
-    expect(deps.which('wl-mirror')).toBe('/usr/bin/wl-mirror')
+    expect(deps.which('grim')).toBe('/usr/bin/grim')
+    expect(deps.surfaceScript).toBe('/opt/followcast/privacy-card.py')
     expect(deps.tickMs).toBe(GEOMETRY_TICK_MS)
   })
 })
@@ -40,11 +42,12 @@ describe('createRuntimePorts', () => {
             yield 'focusedmon>>DP-1,1'
           })()
         },
-        which: () => '/usr/bin/wl-mirror',
+        which: () => '/usr/bin/grim',
         spawn: () => ({ write: () => {}, kill: () => {} }),
         schedule: () => () => {},
         tickMs: 100,
         signal: new AbortController().signal,
+        surfaceScript: '/opt/followcast/privacy-card.py',
       },
     )
     await ports.hyprland.clients()
@@ -78,6 +81,7 @@ describe('createRuntimePorts', () => {
         schedule: () => () => {},
         tickMs: 100,
         signal: new AbortController().signal,
+        surfaceScript: '/opt/followcast/privacy-card.py',
       },
     )
     await ports.hyprland.moveWindow('0xabc', 1638, 1708)
@@ -106,6 +110,7 @@ describe('createRuntimePorts', () => {
         schedule: () => () => {},
         tickMs: 100,
         signal: new AbortController().signal,
+        surfaceScript: '/opt/followcast/privacy-card.py',
       },
     )
     await expect(ports.hyprland.moveWindow('0xabc', 1, 2)).rejects.toThrow(/hyprctl dispatch move/)
@@ -122,7 +127,7 @@ describe('createRuntimePorts', () => {
       {
         exec: async () => '[]',
         openLines: async function* () {},
-        which: () => '/usr/bin/wl-mirror',
+        which: () => '/usr/bin/grim',
         spawn: () => ({ write: () => {}, kill: () => {} }),
         schedule: (_ms, callback) => {
           pulse = callback
@@ -130,6 +135,7 @@ describe('createRuntimePorts', () => {
         },
         tickMs: 100,
         signal: controller.signal,
+        surfaceScript: '/opt/followcast/privacy-card.py',
       },
     )
     const iterator = ports.clock.ticks[Symbol.asyncIterator]()

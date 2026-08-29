@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "followcast",
+  "id": "blitz.followcast",
   "name": "Followcast",
   "version": "1.0.0",
-  "author": "Followcast",
+  "author": "blitz",
   "description": "Mute monitors and apps in the Followcast privacy filter",
   "kinds": ["bar-widget"],
   "entryPoints": {

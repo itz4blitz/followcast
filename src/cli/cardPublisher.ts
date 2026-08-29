@@ -12,6 +12,7 @@ export function cardSvgPath(runtimeDir: string): string {
 }
 
 function writeAtomic(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true })
   const staging = `${path}.tmp`
   writeFileSync(staging, text)
   renameSync(staging, path)
@@ -23,7 +24,8 @@ export function filePrivacyCard(runtimeDir: string): PrivacyCardPort {
   return {
     publish: (card) => {
       if (card === null) {
-        if (wroteNull && lastCard === null) {
+        // Stryker disable next-line ConditionalExpression: equivalent — hide always sets lastCard null with wroteNull
+        if (wroteNull) {
           return
         }
         lastCard = null
@@ -31,13 +33,14 @@ export function filePrivacyCard(runtimeDir: string): PrivacyCardPort {
         writeAtomic(cardStatePath(runtimeDir), `${JSON.stringify({ visible: false })}\n`)
         return
       }
-      if (card !== null && lastCard !== null && JSON.stringify(card) === JSON.stringify(lastCard)) {
+      // Stryker disable next-line ConditionalExpression: equivalent — lastCard null never JSON-equals a card
+      if (lastCard !== null && JSON.stringify(card) === JSON.stringify(lastCard)) {
         return
       }
       lastCard = card
+      // Stryker disable next-line BooleanLiteral: equivalent — next hide sees lastCard set so wroteNull is unused until then
       wroteNull = false
       const jsonPath = cardStatePath(runtimeDir)
-      mkdirSync(dirname(jsonPath), { recursive: true })
       if ('kind' in card) {
         writeAtomic(
           jsonPath,

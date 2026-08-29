@@ -59,11 +59,7 @@ const code = await buildCliMain({
             })
           },
           spawn: (command, args) => {
-            const argv =
-              command === 'wl-mirror'
-                ? (['python3', cardScript] as const)
-                : ([command, ...args] as const)
-            const child = spawn(argv[0], [...argv.slice(1)], {
+            const child = spawn(command, [...args], {
               stdio: ['pipe', 'ignore', 'inherit'],
               env: dummySurfaceEnv(process.env),
             })
@@ -83,6 +79,7 @@ const code = await buildCliMain({
           }),
           exists: existsSync,
           pathEnv: process.env.PATH,
+          surfaceScript: cardScript,
         },
         controller.signal,
       ),
