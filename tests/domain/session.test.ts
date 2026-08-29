@@ -552,7 +552,7 @@ describe('reduceSession', () => {
       options({ privacyRegion: slot }),
       10 + MONITOR_SLIDE_MS,
     )
-    expect(jumped.command).toBe("--region '200,900 1920x1080 DP-3'")
+    expect(jumped.command).toBe("--output 'DP-3'")
     expect(jumped.state.last).toMatchObject({ kind: 'follow', address: '0xmail' })
     expect(jumped.state.pendingFollow).toBeNull()
   })

@@ -356,7 +356,7 @@ describe('runFollowcast', () => {
       controller.signal,
     )
     await handle.ready
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
     w.clients = [
       {
         address: '0xslack',
@@ -387,7 +387,7 @@ describe('runFollowcast', () => {
     w.events.close()
     w.ticks.close()
     await handle.finished
-    expect(w.sent).toEqual(["--region '0,0 2560x1440 DP-1'"])
+    expect(w.sent).toEqual(["--output 'DP-1'"])
   })
 
   it('does not apply a refresh that started after abort', async () => {
