@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntimePorts, GEOMETRY_TICK_MS, runtimeDepsFromIo } from '../src/runtime.ts'
+import {
+  createRuntimePorts,
+  createWindowsRuntimePorts,
+  GEOMETRY_TICK_MS,
+  runtimeDepsFromIo,
+} from '../src/runtime.ts'
 
 describe('runtimeDepsFromIo', () => {
   it('wires which() through PATH lookup', () => {
@@ -148,5 +153,80 @@ describe('createRuntimePorts', () => {
     await expect(first).resolves.toEqual({ value: undefined, done: false })
     controller.abort()
     await iterator.next()
+  })
+})
+
+describe('createWindowsRuntimePorts', () => {
+  it('wires win32 desktop queries, python mirror surface, and clock ticks', async () => {
+    const controller = new AbortController()
+    const queries: string[] = []
+    const spawned: string[][] = []
+    const writes: string[] = []
+    let pulse: (() => void) | undefined
+    const ports = createWindowsRuntimePorts({
+      query: async (command) => {
+        queries.push(command)
+        return '[]'
+      },
+      events: async function* () {
+        yield 'activewindowv2>>0x1'
+      },
+      which: (binary) => (binary === 'python' ? 'C:\\Python313\\python.exe' : null),
+      spawn: (argv) => {
+        spawned.push([...argv])
+        return {
+          write: (line) => {
+            writes.push(line)
+          },
+          kill: () => {},
+        }
+      },
+      schedule: (_ms, callback) => {
+        pulse = callback
+        return () => {}
+      },
+      tickMs: 100,
+      signal: controller.signal,
+      surfaceScript: 'C:\\followcast\\win32_surface.py',
+    })
+    await expect(ports.hyprland.clients()).resolves.toEqual([])
+    expect(queries).toEqual(['clients'])
+    const lines: string[] = []
+    for await (const line of ports.hyprland.events()) {
+      lines.push(line)
+    }
+    expect(lines).toEqual(['activewindowv2>>0x1'])
+    await ports.mirror.start('DISPLAY1')
+    expect(spawned).toEqual([['python', '-u', 'C:\\followcast\\win32_surface.py']])
+    expect(writes).toEqual(["--output 'DISPLAY1'"])
+    await ports.mirror.stop()
+    const iterator = ports.clock.ticks[Symbol.asyncIterator]()
+    const first = iterator.next()
+    expect(pulse).toBeDefined()
+    if (pulse === undefined) {
+      throw new Error('schedule was not installed')
+    }
+    pulse()
+    await expect(first).resolves.toEqual({ value: undefined, done: false })
+    controller.abort()
+    await iterator.next()
+  })
+
+  it('reports a Windows-specific error when python is missing from PATH', async () => {
+    const ports = createWindowsRuntimePorts({
+      query: async () => '[]',
+      events: async function* () {},
+      which: () => null,
+      spawn: () => {
+        throw new Error('should not spawn')
+      },
+      schedule: () => () => {},
+      tickMs: 100,
+      signal: new AbortController().signal,
+      surfaceScript: 'C:\\followcast\\win32_surface.py',
+    })
+    await expect(ports.mirror.start('DISPLAY1')).rejects.toThrow(
+      'python is not installed; install Python 3 from python.org',
+    )
   })
 })

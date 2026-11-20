@@ -10,7 +10,7 @@ import {
 import type { FollowcastPorts } from '../ports.ts'
 import { parseArgs } from './parseArgs.ts'
 
-export const USAGE = `followcast — share this window; it follows the focused Hyprland app
+export const USAGE = `followcast — share this window; it follows the focused display (Linux Hyprland & Windows)
 
 Usage:
   followcast
@@ -22,8 +22,8 @@ Usage:
   followcast status
   followcast --help
 
-In the Omarchy share picker, choose the window titled Followcast.
-Use the Followcast bar chip to mute monitors or apps (privacy card).
+In your share picker (Meet, Zoom, Discord), choose the window titled Followcast.
+Use \`followcast policy\` (or the Omarchy bar chip on Linux) to mute monitors or apps.
 `
 
 export type PolicyIo = {

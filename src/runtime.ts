@@ -8,12 +8,24 @@ import type { FollowcastPorts } from './ports.ts'
 import { createExecFile, type ExecFileFn } from './process/exec.ts'
 import { createNodeSpawn, type SpawnFn } from './process/spawn.ts'
 import { whichOnPath } from './process/which.ts'
+import { createWindowsDesktopPort, type WindowsQuery } from './windows/port.ts'
 
 export const GEOMETRY_TICK_MS = 100
 
 export type RuntimeDeps = {
   readonly exec: HyprlandExec
   readonly openLines: (path: string) => AsyncIterable<string>
+  readonly which: (binary: string) => string | null
+  readonly spawn: (argv: readonly string[]) => SpawnedMirror
+  readonly schedule: Schedule
+  readonly tickMs: number
+  readonly signal: AbortSignal
+  readonly surfaceScript: string
+}
+
+export type WindowsRuntimeDeps = {
+  readonly query: WindowsQuery
+  readonly events: () => AsyncIterable<string>
   readonly which: (binary: string) => string | null
   readonly spawn: (argv: readonly string[]) => SpawnedMirror
   readonly schedule: Schedule
@@ -41,6 +53,26 @@ export function createRuntimePorts(env: HyprlandEnv, deps: RuntimeDeps): Followc
       which: deps.which,
       spawn: deps.spawn,
       surfaceScript: deps.surfaceScript,
+    }),
+    clock: {
+      ticks: intervalTicks(deps.tickMs, deps.signal, deps.schedule),
+    },
+  }
+}
+
+export function createWindowsRuntimePorts(deps: WindowsRuntimeDeps): FollowcastPorts {
+  return {
+    hyprland: createWindowsDesktopPort({
+      query: deps.query,
+      events: deps.events,
+    }),
+    mirror: createMirrorPort({
+      which: deps.which,
+      spawn: deps.spawn,
+      surfaceScript: deps.surfaceScript,
+      pythonBinary: 'python',
+      requiredBinary: 'python',
+      missingBinaryMessage: 'python is not installed; install Python 3 from python.org',
     }),
     clock: {
       ticks: intervalTicks(deps.tickMs, deps.signal, deps.schedule),

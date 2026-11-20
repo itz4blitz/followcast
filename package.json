@@ -1,8 +1,8 @@
 {
   "name": "followcast",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": false,
-  "description": "Share one Followcast window. It always shows the Hyprland keyboard-focused app, even on another monitor.",
+  "description": "Cross-platform share window for Linux (Hyprland) and Windows. Always shows the keyboard-focused display, with per-monitor and per-app privacy cards.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
@@ -18,9 +18,12 @@
   },
   "files": [
     "dist",
+    "docs",
     "omarchy-plugin",
     "privacy-card.py",
     "capture_argv.py",
+    "win32_desktop.py",
+    "win32_surface.py",
     "LICENSE",
     "README.md"
   ],
@@ -35,7 +38,7 @@
     "knip": "knip --max-issues 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:python": "python3 -m unittest discover -s tests -p 'test_*.py'",
+    "test:python": "node -e \"import('node:child_process').then(({spawnSync})=>{const r=spawnSync(process.platform==='win32'?'python':'python3',['-m','unittest','discover','-s','tests','-p','test_*.py'],{stdio:'inherit'});process.exit(r.status??1)})\"",
     "coverage": "vitest run --coverage",
     "mutation": "stryker run stryker.config.ts",
     "build": "tsc -p tsconfig.build.json",
