@@ -13,19 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: npm ci
       - run: npm run ci
       - run: npm run build
       - run: npm pack
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: npm-tarball
           path: followcast-*.tgz
@@ -35,8 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -62,7 +62,7 @@ jobs:
           cp -r omarchy-plugin build/linux-stage/
           ./build/linux-stage/followcast --help
           tar -czf followcast-linux-x64.tar.gz -C build/linux-stage .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-bundle
           path: followcast-linux-x64.tar.gz
@@ -72,12 +72,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: npm ci
@@ -106,19 +106,20 @@ jobs:
           & build/win-stage/followcast.exe --help
           Compress-Archive -Path build/win-stage/* -DestinationPath followcast-win-x64.zip -Force
           iscc "/DMyAppVersion=$version" "/DStageDir=..\..\build\win-stage" installer/windows/followcast.iss
-      - uses: actions/upload-artifact@v4
+          Move-Item -Force build/followcast-setup-x64.exe followcast-setup-x64.exe
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-bundle
           path: |
             followcast-win-x64.zip
-            build/followcast-setup-x64.exe
+            followcast-setup-x64.exe
 
   publish:
     needs: [verify, build-linux, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
@@ -128,10 +129,15 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
+          mapfile -t ASSETS < <(find release-assets -type f | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "No release assets found" >&2
+            exit 1
+          fi
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" release-assets/* --repo "$REPO" --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --repo "$REPO" --clobber
           else
-            gh release create "$TAG" release-assets/* \
+            gh release create "$TAG" "${ASSETS[@]}" \
               --repo "$REPO" \
               --title "Followcast $TAG" \
               --generate-notes

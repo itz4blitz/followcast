@@ -1,6 +1,6 @@
 {
   "name": "followcast",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": false,
   "description": "Cross-platform share window for Linux (Hyprland) and Windows. Always shows the keyboard-focused display, with per-monitor and per-app privacy cards.",
   "license": "Apache-2.0",
