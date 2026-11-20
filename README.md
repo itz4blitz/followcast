@@ -29,8 +29,14 @@ source.
 
 ### Windows (10 / 11)
 
-Requirements: **Node.js 20.19+** and **Python 3.10+** on `PATH` (standard library only —
-no extra `pip` packages needed).
+**Option 1 — Standalone `.exe` bundle (no Node.js or Python required):**
+
+Download `followcast-win-x64.zip` from
+[GitHub Releases](https://github.com/itz4blitz/followcast/releases), unzip it, and add the
+folder to your `PATH` (contains `followcast.exe`, `win32_desktop.exe`, and
+`win32_surface.exe`).
+
+**Option 2 — From npm tarball or source (requires Node.js 20.19+ and Python 3.10+):**
 
 ```powershell
 # From a GitHub Release tarball
@@ -43,15 +49,20 @@ npm run build
 npm link
 ```
 
-See [docs/windows.md](docs/windows.md) for PowerShell tips, DPI notes, and capture picker
-guidance.
+For a Windows 11 taskbar toggle widget (equivalent to the Omarchy bar chip), see
+[widbar-plugin/README.md](widbar-plugin/README.md) and [docs/windows.md](docs/windows.md).
 
 ### Linux (Hyprland / Wayland)
 
-Requirements: **Node.js 20.19+**, `grim`, `python-gobject`, and `gtk4`.
+Requirements: `grim`, `python-gobject`, and `gtk4` (plus **Node.js 20.19+** only if
+installing the `.tgz` tarball instead of the standalone `followcast-linux-x64.tar.gz`
+binary).
 
 ```bash
 pacman -S grim python-gobject gtk4
+# Standalone binary bundle:
+gh release download --repo itz4blitz/followcast --pattern 'followcast-linux-x64.tar.gz'
+# Or npm tarball:
 gh release download --repo itz4blitz/followcast --pattern 'followcast-*.tgz'
 npm install -g ./followcast-*.tgz
 ```

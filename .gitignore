@@ -3,6 +3,10 @@ coverage/
 reports/
 .stryker-tmp/
 dist/
+build/
+widbar-plugin/artifacts/
+widbar-plugin/src/**/bin/
+widbar-plugin/src/**/obj/
 .grok/
 tmp*
 *.log

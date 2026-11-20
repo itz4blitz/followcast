@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -25,15 +25,108 @@ jobs:
       - run: npm run ci
       - run: npm run build
       - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: followcast-*.tgz
+
+  build-linux:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build Linux standalone binary (Node SEA)
+        run: |
+          mkdir -p build/linux-stage
+          npx --yes esbuild src/cli.ts --bundle --platform=node --format=cjs --outfile=build/followcast.cjs
+          cat <<'EOF' > build/sea-config.json
+          {
+            "main": "build/followcast.cjs",
+            "output": "build/sea-prep.blob",
+            "disableExperimentalSEAWarning": true,
+            "useCodeCache": false
+          }
+          EOF
+          node --experimental-sea-config build/sea-config.json
+          cp "$(command -v node)" build/linux-stage/followcast
+          npx --yes postject build/linux-stage/followcast NODE_SEA_BLOB build/sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          chmod +x build/linux-stage/followcast
+          cp privacy-card.py capture_argv.py LICENSE README.md build/linux-stage/
+          cp -r omarchy-plugin build/linux-stage/
+          ./build/linux-stage/followcast --help
+          tar -czf followcast-linux-x64.tar.gz -C build/linux-stage .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: followcast-linux-x64.tar.gz
+
+  build-windows:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Build Windows standalone binaries (Node SEA + PyInstaller)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/win-stage | Out-Null
+          npx --yes esbuild src/cli.ts --bundle --platform=node --format=cjs --outfile=build/followcast.cjs
+          @'
+          {
+            "main": "build/followcast.cjs",
+            "output": "build/sea-prep.blob",
+            "disableExperimentalSEAWarning": true,
+            "useCodeCache": false
+          }
+          '@ | Set-Content -Path build/sea-config.json -Encoding UTF8
+          node --experimental-sea-config build/sea-config.json
+          Copy-Item (Get-Command node).Source build/win-stage/followcast.exe
+          npx --yes postject build/win-stage/followcast.exe NODE_SEA_BLOB build/sea-prep.blob `
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          python -m pip install --upgrade pyinstaller
+          python -m PyInstaller --onefile --noconsole --distpath build/win-stage --workpath build/pyi-desktop --specpath build win32_desktop.py
+          python -m PyInstaller --onefile --noconsole --distpath build/win-stage --workpath build/pyi-surface --specpath build win32_surface.py
+          Copy-Item LICENSE, README.md build/win-stage/
+          & build/win-stage/followcast.exe --help
+          Compress-Archive -Path build/win-stage/* -DestinationPath followcast-win-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: followcast-win-x64.zip
+
+  publish:
+    needs: [verify, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" followcast-*.tgz --clobber
+            gh release upload "$TAG" release-assets/* --clobber
           else
-            gh release create "$TAG" followcast-*.tgz \
+            gh release create "$TAG" release-assets/* \
               --title "Followcast $TAG" \
               --generate-notes
           fi

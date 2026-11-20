@@ -13,21 +13,24 @@ export type MirrorPortDeps = {
   which(binary: string): string | null
   spawn(argv: readonly string[]): SpawnedMirror
   surfaceScript: string
+  surfaceArgv?: readonly string[]
   pythonBinary?: string
-  requiredBinary?: string
+  requiredBinary?: string | null
   missingBinaryMessage?: string
 }
 
 export function createMirrorPort(deps: MirrorPortDeps): MirrorPort {
   let child: SpawnedMirror | null = null
-  const requiredBinary = deps.requiredBinary ?? 'grim'
+  const requiredBinary = deps.requiredBinary === undefined ? 'grim' : deps.requiredBinary
   const missingMessage = deps.missingBinaryMessage ?? 'grim is not installed; pacman -S grim'
   return {
     start: async (output: string) => {
-      if (deps.which(requiredBinary) === null) {
+      if (requiredBinary !== null && deps.which(requiredBinary) === null) {
         throw new Error(missingMessage)
       }
-      child = deps.spawn(dummySurfaceArgv(deps.surfaceScript, deps.pythonBinary))
+      child = deps.spawn(
+        deps.surfaceArgv ?? dummySurfaceArgv(deps.surfaceScript, deps.pythonBinary),
+      )
       child.write(`--output '${output}'`)
     },
     send: (line: string) => {

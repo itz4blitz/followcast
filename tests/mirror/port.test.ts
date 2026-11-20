@@ -72,6 +72,31 @@ describe('createMirrorPort', () => {
     await expect(port.start('DISPLAY1')).rejects.toThrow('python is not installed')
   })
 
+  it('spawns a standalone surface executable without PATH lookup when requiredBinary is null', async () => {
+    const writes: string[] = []
+    const spawned: string[][] = []
+    const port = createMirrorPort({
+      which: () => {
+        throw new Error('which should not be called')
+      },
+      spawn: (argv) => {
+        spawned.push([...argv])
+        return {
+          write: (line) => {
+            writes.push(line)
+          },
+          kill: () => {},
+        }
+      },
+      surfaceScript: 'C:\\followcast\\win32_surface.exe',
+      surfaceArgv: ['C:\\followcast\\win32_surface.exe'],
+      requiredBinary: null,
+    })
+    await port.start('DISPLAY1')
+    expect(spawned).toEqual([['C:\\followcast\\win32_surface.exe']])
+    expect(writes).toEqual(["--output 'DISPLAY1'"])
+  })
+
   it('spawns the surface and immediately streams the initial output', async () => {
     const writes: string[] = []
     let killed = false

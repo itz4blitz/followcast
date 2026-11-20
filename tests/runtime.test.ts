@@ -229,4 +229,33 @@ describe('createWindowsRuntimePorts', () => {
       'python is not installed; install Python 3 from python.org',
     )
   })
+
+  it('spawns a standalone Windows surface executable directly when surfaceExecutable is provided', async () => {
+    const spawned: string[][] = []
+    const writes: string[] = []
+    const ports = createWindowsRuntimePorts({
+      query: async () => '[]',
+      events: async function* () {},
+      which: () => {
+        throw new Error('which should not be called')
+      },
+      spawn: (argv) => {
+        spawned.push([...argv])
+        return {
+          write: (line) => {
+            writes.push(line)
+          },
+          kill: () => {},
+        }
+      },
+      schedule: () => () => {},
+      tickMs: 100,
+      signal: new AbortController().signal,
+      surfaceScript: 'C:\\followcast\\win32_surface.py',
+      surfaceExecutable: 'C:\\followcast\\win32_surface.exe',
+    })
+    await ports.mirror.start('DISPLAY1')
+    expect(spawned).toEqual([['C:\\followcast\\win32_surface.exe']])
+    expect(writes).toEqual(["--output 'DISPLAY1'"])
+  })
 })

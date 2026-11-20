@@ -79,6 +79,19 @@ followcast policy set-app Discord on
 - **Policy file**: `%APPDATA%\followcast\policy.json` (or `$XDG_CONFIG_HOME/followcast/policy.json` if set)
 - **Runtime privacy card state**: `%LOCALAPPDATA%\followcast\privacy.json` (fallback: `%TEMP%\followcast\privacy.json`)
 
+## WidBar Taskbar Widget (Windows 11)
+
+Followcast ships a native Windows 11 [WidBar](https://apps.microsoft.com/detail/9PKLDNM83TP9)
+widget in `widbar-plugin/` — the Windows counterpart to `omarchy-plugin/`.
+
+```powershell
+cd widbar-plugin
+.\deploy.ps1
+```
+
+Then add **Followcast** to your WidBar taskbar to see `Live` / `Hidden` / `Idle` status
+and toggle monitors or apps with a click. See [widbar-plugin/README.md](../widbar-plugin/README.md).
+
 ## How the Windows Backend Works
 
 - **`win32_desktop.py`**:

@@ -26,7 +26,15 @@ const noForEach: Rule.RuleModule = {
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/', 'coverage/', 'reports/', '.stryker-tmp/', 'dist/'],
+    ignores: [
+      'node_modules/',
+      'coverage/',
+      'reports/',
+      '.stryker-tmp/',
+      'dist/',
+      'build/',
+      'widbar-plugin/',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

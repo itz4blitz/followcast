@@ -25,19 +25,12 @@ import {
 } from './runtime.ts'
 import { createWindowsDesktopPort, type WindowsDesktopCommand } from './windows/port.ts'
 
-const controller = new AbortController()
-process.once('SIGINT', () => {
-  controller.abort()
-})
-process.once('SIGTERM', () => {
-  controller.abort()
-})
-
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const policy = diskPolicy(process.env)
-const runtimeDir = runtimeDirFromEnv(process.env, tmpdir())
-const privacyCard = filePrivacyCard(runtimeDir)
-const isWindows = process.platform === 'win32'
+function resolvePackageRoot(): string {
+  if (typeof import.meta.url === 'string' && import.meta.url !== '') {
+    return join(dirname(fileURLToPath(import.meta.url)), '..')
+  }
+  return dirname(process.execPath)
+}
 
 function runExecFile(
   command: string,
@@ -50,11 +43,24 @@ function runExecFile(
   })
 }
 
+function win32DesktopCommand(
+  desktopExe: string | undefined,
+  desktopScript: string,
+  subcommand: string,
+): { readonly command: string; readonly args: readonly string[] } {
+  if (desktopExe !== undefined) {
+    return { command: desktopExe, args: [subcommand] }
+  }
+  return { command: 'python', args: ['-u', desktopScript, subcommand] }
+}
+
 function createWin32ServeQuery(
+  desktopExe: string | undefined,
   scriptPath: string,
   signal: AbortSignal,
 ): (command: WindowsDesktopCommand) => Promise<string> {
-  const child = spawn('python', ['-u', scriptPath, 'serve'], {
+  const spec = win32DesktopCommand(desktopExe, scriptPath, 'serve')
+  const child = spawn(spec.command, [...spec.args], {
     stdio: ['pipe', 'pipe', 'inherit'],
     windowsHide: true,
   })
@@ -99,8 +105,13 @@ function createWin32ServeQuery(
     })
 }
 
-async function* createWin32Events(scriptPath: string, signal: AbortSignal): AsyncIterable<string> {
-  const child = spawn('python', ['-u', scriptPath, 'events'], {
+async function* createWin32Events(
+  desktopExe: string | undefined,
+  scriptPath: string,
+  signal: AbortSignal,
+): AsyncIterable<string> {
+  const spec = win32DesktopCommand(desktopExe, scriptPath, 'events')
+  const child = spawn(spec.command, [...spec.args], {
     stdio: ['ignore', 'pipe', 'inherit'],
     windowsHide: true,
   })
@@ -125,72 +136,66 @@ async function* createWin32Events(scriptPath: string, signal: AbortSignal): Asyn
   }
 }
 
-const win32DesktopScript = join(packageRoot, 'win32_desktop.py')
-const win32SurfaceScript = join(packageRoot, 'win32_surface.py')
-const cardScript = join(packageRoot, 'privacy-card.py')
+async function main(): Promise<void> {
+  const controller = new AbortController()
+  process.once('SIGINT', () => {
+    controller.abort()
+  })
+  process.once('SIGTERM', () => {
+    controller.abort()
+  })
 
-const snapshotExec = createExecFile(runExecFile)
-const snapshotPort = isWindows
-  ? createWindowsDesktopPort({
-      query: (command) => snapshotExec(['python', win32DesktopScript, command]),
-      events: async function* empty() {},
-    })
-  : createHyprlandPort({
-      exec: snapshotExec,
-      events: async function* empty() {},
-    })
+  const packageRoot = resolvePackageRoot()
+  const policy = diskPolicy(process.env)
+  const runtimeDir = runtimeDirFromEnv(process.env, tmpdir())
+  const privacyCard = filePrivacyCard(runtimeDir)
+  const isWindows = process.platform === 'win32'
 
-const code = await buildCliMain({
-  argv: process.argv.slice(2),
-  stdout: process.stdout,
-  stderr: process.stderr,
-  policy,
-  snapshot: async () =>
-    toDesktopSnapshot(
-      await snapshotPort.clients(),
-      await snapshotPort.monitors(),
-      await snapshotPort.activeWindow(),
-    ),
-  createPorts: () => {
-    if (isWindows) {
-      const ports = createWindowsRuntimePorts({
-        query: createWin32ServeQuery(win32DesktopScript, controller.signal),
-        events: () => createWin32Events(win32DesktopScript, controller.signal),
-        which: (binary) =>
-          whichOnPath(binary, process.env.PATH, existsSync, delimiter, ['.exe', '.cmd']),
-        spawn: createNodeSpawn((command, args) => {
-          const child = spawn(command, [...args], {
-            stdio: ['pipe', 'ignore', 'inherit'],
-            env: dummySurfaceEnv(process.env),
-            windowsHide: true,
-          })
-          const stdin = child.stdin
-          if (stdin === null) {
-            throw new Error('Followcast surface stdin is not available')
-          }
-          return {
-            stdin,
-            kill: () => {
-              child.kill()
-            },
-          }
-        }),
-        schedule: nodeSchedule,
-        tickMs: GEOMETRY_TICK_MS,
-        signal: controller.signal,
-        surfaceScript: win32SurfaceScript,
+  const win32DesktopScript = join(packageRoot, 'win32_desktop.py')
+  const win32SurfaceScript = join(packageRoot, 'win32_surface.py')
+  const win32DesktopExePath = join(packageRoot, 'win32_desktop.exe')
+  const win32SurfaceExePath = join(packageRoot, 'win32_surface.exe')
+  const win32DesktopExe = existsSync(win32DesktopExePath) ? win32DesktopExePath : undefined
+  const win32SurfaceExe = existsSync(win32SurfaceExePath) ? win32SurfaceExePath : undefined
+  const cardScript = join(packageRoot, 'privacy-card.py')
+
+  const snapshotExec = createExecFile(runExecFile)
+  const snapshotPort = isWindows
+    ? createWindowsDesktopPort({
+        query: (command) => {
+          const spec = win32DesktopCommand(win32DesktopExe, win32DesktopScript, command)
+          return snapshotExec([spec.command, ...spec.args])
+        },
+        events: async function* empty() {},
       })
-      return { ...ports, privacyCard }
-    }
-    const ports = createRuntimePorts(
-      process.env,
-      runtimeDepsFromIo(
-        {
-          execFile: runExecFile,
-          spawn: (command, args) => {
+    : createHyprlandPort({
+        exec: snapshotExec,
+        events: async function* empty() {},
+      })
+
+  const code = await buildCliMain({
+    argv: process.argv.slice(2),
+    stdout: process.stdout,
+    stderr: process.stderr,
+    policy,
+    snapshot: async () =>
+      toDesktopSnapshot(
+        await snapshotPort.clients(),
+        await snapshotPort.monitors(),
+        await snapshotPort.activeWindow(),
+      ),
+    createPorts: () => {
+      if (isWindows) {
+        const ports = createWindowsRuntimePorts({
+          query: createWin32ServeQuery(win32DesktopExe, win32DesktopScript, controller.signal),
+          events: () => createWin32Events(win32DesktopExe, win32DesktopScript, controller.signal),
+          which: (binary) =>
+            whichOnPath(binary, process.env.PATH, existsSync, delimiter, ['.exe', '.cmd']),
+          spawn: createNodeSpawn((command, args) => {
             const child = spawn(command, [...args], {
               stdio: ['pipe', 'ignore', 'inherit'],
               env: dummySurfaceEnv(process.env),
+              windowsHide: true,
             })
             const stdin = child.stdin
             if (stdin === null) {
@@ -202,20 +207,52 @@ const code = await buildCliMain({
                 child.kill()
               },
             }
-          },
-          connect: (path) => ({
-            readable: createInterface({ input: createConnection(path) }),
           }),
-          exists: existsSync,
-          pathEnv: process.env.PATH,
-          surfaceScript: cardScript,
-        },
-        controller.signal,
-      ),
-    )
-    return { ...ports, privacyCard }
-  },
-  signal: controller.signal,
-})
+          schedule: nodeSchedule,
+          tickMs: GEOMETRY_TICK_MS,
+          signal: controller.signal,
+          surfaceScript: win32SurfaceScript,
+          surfaceExecutable: win32SurfaceExe,
+        })
+        return { ...ports, privacyCard }
+      }
+      const ports = createRuntimePorts(
+        process.env,
+        runtimeDepsFromIo(
+          {
+            execFile: runExecFile,
+            spawn: (command, args) => {
+              const child = spawn(command, [...args], {
+                stdio: ['pipe', 'ignore', 'inherit'],
+                env: dummySurfaceEnv(process.env),
+              })
+              const stdin = child.stdin
+              if (stdin === null) {
+                throw new Error('Followcast surface stdin is not available')
+              }
+              return {
+                stdin,
+                kill: () => {
+                  child.kill()
+                },
+              }
+            },
+            connect: (path) => ({
+              readable: createInterface({ input: createConnection(path) }),
+            }),
+            exists: existsSync,
+            pathEnv: process.env.PATH,
+            surfaceScript: cardScript,
+          },
+          controller.signal,
+        ),
+      )
+      return { ...ports, privacyCard }
+    },
+    signal: controller.signal,
+  })
 
-process.exit(code)
+  process.exit(code)
+}
+
+void main()

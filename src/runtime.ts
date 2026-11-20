@@ -32,6 +32,7 @@ export type WindowsRuntimeDeps = {
   readonly tickMs: number
   readonly signal: AbortSignal
   readonly surfaceScript: string
+  readonly surfaceExecutable?: string
 }
 
 export type RuntimeIo = {
@@ -61,6 +62,7 @@ export function createRuntimePorts(env: HyprlandEnv, deps: RuntimeDeps): Followc
 }
 
 export function createWindowsRuntimePorts(deps: WindowsRuntimeDeps): FollowcastPorts {
+  const standalone = deps.surfaceExecutable !== undefined
   return {
     hyprland: createWindowsDesktopPort({
       query: deps.query,
@@ -70,8 +72,9 @@ export function createWindowsRuntimePorts(deps: WindowsRuntimeDeps): FollowcastP
       which: deps.which,
       spawn: deps.spawn,
       surfaceScript: deps.surfaceScript,
+      surfaceArgv: standalone ? [deps.surfaceExecutable] : undefined,
       pythonBinary: 'python',
-      requiredBinary: 'python',
+      requiredBinary: standalone ? null : 'python',
       missingBinaryMessage: 'python is not installed; install Python 3 from python.org',
     }),
     clock: {
