@@ -81,9 +81,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
-      - name: Build Windows standalone binaries (Node SEA + PyInstaller)
+      - name: Build Windows standalone binaries and installer (Node SEA + PyInstaller + Inno Setup)
         shell: pwsh
         run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
           New-Item -ItemType Directory -Force build/win-stage | Out-Null
           npx --yes esbuild src/cli.ts --bundle --platform=node --format=cjs --outfile=build/followcast.cjs
           @'
@@ -104,10 +105,13 @@ jobs:
           Copy-Item LICENSE, README.md build/win-stage/
           & build/win-stage/followcast.exe --help
           Compress-Archive -Path build/win-stage/* -DestinationPath followcast-win-x64.zip -Force
+          iscc "/DMyAppVersion=$version" "/DStageDir=..\..\build\win-stage" installer/windows/followcast.iss
       - uses: actions/upload-artifact@v4
         with:
           name: windows-bundle
-          path: followcast-win-x64.zip
+          path: |
+            followcast-win-x64.zip
+            build/followcast-setup-x64.exe
 
   publish:
     needs: [verify, build-linux, build-windows]
@@ -122,11 +126,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release-assets/* --clobber
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --repo "$REPO" --clobber
           else
             gh release create "$TAG" release-assets/* \
+              --repo "$REPO" \
               --title "Followcast $TAG" \
               --generate-notes
           fi
