@@ -22,7 +22,7 @@ export const USAGE = `followcast — share this window; it follows the focused d
 
 Usage:
   followcast
-  followcast start
+  followcast start [--foreground]
   followcast stop
   followcast hide
   followcast resume
@@ -48,6 +48,7 @@ export type PolicyIo = {
 type DaemonIo = {
   acquire(): () => void
   stop(): boolean
+  spawnDetached?(denyClasses: readonly string[]): number
 }
 
 type UpdateIo = {
@@ -106,6 +107,16 @@ export async function buildCliMain(io: CliIo): Promise<number> {
   }
   if (parsed.kind === 'update') {
     return handleUpdate(io)
+  }
+  if (!parsed.foreground && io.daemon?.spawnDetached !== undefined) {
+    try {
+      const pid = io.daemon.spawnDetached(parsed.denyClasses)
+      io.stdout.write(`Followcast started (pid ${String(pid)}).\n`)
+      return 0
+    } catch (error) {
+      io.stderr.write(`${formatError(error)}\n`)
+      return 1
+    }
   }
   const options: FollowOptions = {
     selfClasses: DEFAULT_FOLLOW_OPTIONS.selfClasses,

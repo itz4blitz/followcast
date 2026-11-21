@@ -3,17 +3,23 @@ import { parseArgs } from '../../src/cli/parseArgs.ts'
 
 describe('parseArgs', () => {
   it('runs with default options when given no flags', () => {
-    expect(parseArgs([])).toEqual({ kind: 'run', denyClasses: [] })
+    expect(parseArgs([])).toEqual({ kind: 'run', denyClasses: [], foreground: false })
   })
 
   it('treats start as the default command', () => {
-    expect(parseArgs(['start'])).toEqual({ kind: 'run', denyClasses: [] })
+    expect(parseArgs(['start'])).toEqual({ kind: 'run', denyClasses: [], foreground: false })
+  })
+
+  it('supports --foreground and -f flags', () => {
+    expect(parseArgs(['--foreground'])).toEqual({ kind: 'run', denyClasses: [], foreground: true })
+    expect(parseArgs(['start', '-f'])).toEqual({ kind: 'run', denyClasses: [], foreground: true })
   })
 
   it('collects repeated --deny-class values', () => {
     expect(parseArgs(['--deny-class', 'zoom', '--deny-class', 'skype'])).toEqual({
       kind: 'run',
       denyClasses: ['zoom', 'skype'],
+      foreground: false,
     })
   })
 

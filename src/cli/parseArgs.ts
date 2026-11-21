@@ -2,7 +2,7 @@ export type ParsedArgs =
   | { readonly kind: 'help' }
   | { readonly kind: 'version' }
   | { readonly kind: 'update' }
-  | { readonly kind: 'run'; readonly denyClasses: readonly string[] }
+  | { readonly kind: 'run'; readonly denyClasses: readonly string[]; readonly foreground: boolean }
   | { readonly kind: 'status' }
   | { readonly kind: 'stop' }
   | { readonly kind: 'policy-show' }
@@ -75,6 +75,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
   }
 
   const denyClasses: string[] = []
+  let foreground = false
   let skipNext = false
   for (const [index, token] of argv.entries()) {
     if (skipNext) {
@@ -85,6 +86,10 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       return { kind: 'help' }
     }
     if (token === 'start') {
+      continue
+    }
+    if (token === '--foreground' || token === '-f') {
+      foreground = true
       continue
     }
     if (token === '--deny-class') {
@@ -98,5 +103,5 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     }
     return { kind: 'error', message: `unknown argument: ${token}` }
   }
-  return { kind: 'run', denyClasses }
+  return { kind: 'run', denyClasses, foreground }
 }

@@ -23,9 +23,17 @@ function parsePid(raw: string | null): number | null {
   return parsed > 0 ? parsed : null
 }
 
-export function acquirePidLock(path: string, io: PidLockIo): () => void {
+export function readRunningPid(path: string, io: PidLockIo): number | null {
   const existing = parsePid(io.readFile(path))
   if (existing !== null && existing !== io.currentPid && io.isAlive(existing)) {
+    return existing
+  }
+  return null
+}
+
+export function acquirePidLock(path: string, io: PidLockIo): () => void {
+  const existing = readRunningPid(path, io)
+  if (existing !== null) {
     throw new Error(`Followcast is already running (pid ${String(existing)})`)
   }
   io.writeFile(path, `${String(io.currentPid)}\n`)

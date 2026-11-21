@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   acquirePidLock,
   pidFilePath,
+  readRunningPid,
   stopRunningDaemon,
   type PidLockIo,
 } from '../../src/cli/pidLock.ts'
@@ -121,5 +122,22 @@ describe('stopRunningDaemon', () => {
     expect(stopRunningDaemon(path, io)).toBe(false)
     expect(files.has(path)).toBe(false)
     expect(killed).toEqual([])
+  })
+})
+
+describe('readRunningPid', () => {
+  it('returns the live PID of another instance or null otherwise', () => {
+    const path = '/run/followcast/followcast.pid'
+    const noProbe = memoryIo({
+      isAlive: () => {
+        throw new Error('should not check liveness without a PID')
+      },
+    })
+    expect(readRunningPid(path, noProbe.io)).toBeNull()
+    const { io, files } = memoryIo({ isAlive: (pid) => pid === 9001 })
+    files.set(path, '9001\n')
+    expect(readRunningPid(path, io)).toBe(9001)
+    files.set(path, '4242\n')
+    expect(readRunningPid(path, io)).toBeNull()
   })
 })

@@ -9,7 +9,13 @@ import { fileURLToPath } from 'node:url'
 import { filePrivacyCard } from './cli/cardPublisher.ts'
 import { buildCliMain } from './cli/cliMain.ts'
 import { diskPolicy } from './cli/diskPolicy.ts'
-import { acquirePidLock, pidFilePath, stopRunningDaemon, type PidLockIo } from './cli/pidLock.ts'
+import {
+  acquirePidLock,
+  pidFilePath,
+  readRunningPid,
+  stopRunningDaemon,
+  type PidLockIo,
+} from './cli/pidLock.ts'
 import { runtimeDirFromEnv } from './cli/policyStore.ts'
 import { dummySurfaceEnv } from './cli/privacyCardProcess.ts'
 import { nodeSchedule } from './clock/interval.ts'
@@ -26,7 +32,7 @@ import {
 } from './runtime.ts'
 import { createWindowsDesktopPort, type WindowsDesktopCommand } from './windows/port.ts'
 
-const APP_VERSION = '0.6.2'
+const APP_VERSION = '0.6.3'
 const GITHUB_LATEST_URL = 'https://api.github.com/repos/itz4blitz/followcast/releases/latest'
 
 function readAppVersion(packageRoot: string): string {
@@ -289,6 +295,24 @@ async function main(): Promise<void> {
     daemon: {
       acquire: () => acquirePidLock(lockPath, pidLockIo),
       stop: () => stopRunningDaemon(lockPath, pidLockIo),
+      spawnDetached: (denyClasses) => {
+        const existing = readRunningPid(lockPath, pidLockIo)
+        if (existing !== null) {
+          throw new Error(`Followcast is already running (pid ${String(existing)})`)
+        }
+        const scriptArgs =
+          typeof import.meta.url === 'string' && import.meta.url !== ''
+            ? [fileURLToPath(import.meta.url)]
+            : []
+        const denyArgs = denyClasses.flatMap((cls) => ['--deny-class', cls])
+        const child = spawn(process.execPath, [...scriptArgs, ...denyArgs, '--foreground'], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+        })
+        child.unref()
+        return child.pid ?? 0
+      },
     },
     snapshot: async () =>
       toDesktopSnapshot(

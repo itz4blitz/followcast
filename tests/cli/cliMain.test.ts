@@ -644,4 +644,75 @@ describe('buildCliMain', () => {
     ).toBe(1)
     expect(stderr.join('')).toBe('network down\n')
   })
+
+  it('spawns detached by default when daemon.spawnDetached is provided, and runs foreground with --foreground', async () => {
+    const stdout: string[] = []
+    const spawned: Array<readonly string[]> = []
+    const detachedCode = await buildCliMain({
+      argv: ['--deny-class', 'zoom'],
+      stdout: { write: (chunk) => stdout.push(chunk) },
+      stderr: { write: () => {} },
+      createPorts: () => {
+        throw new Error('should not start in parent')
+      },
+      signal: new AbortController().signal,
+      daemon: {
+        acquire: () => () => {},
+        stop: () => false,
+        spawnDetached: (deny) => {
+          spawned.push(deny)
+          return 1337
+        },
+      },
+    })
+    expect(detachedCode).toBe(0)
+    expect(spawned).toEqual([['zoom']])
+    expect(stdout.join('')).toBe('Followcast started (pid 1337).\n')
+
+    const stderr: string[] = []
+    const errCode = await buildCliMain({
+      argv: [],
+      stdout: { write: () => {} },
+      stderr: { write: (chunk) => stderr.push(chunk) },
+      createPorts: () => {
+        throw new Error('should not start in parent')
+      },
+      signal: new AbortController().signal,
+      daemon: {
+        acquire: () => () => {},
+        stop: () => false,
+        spawnDetached: () => {
+          throw new Error('Followcast is already running (pid 1337)')
+        },
+      },
+    })
+    expect(errCode).toBe(1)
+    expect(stderr.join('')).toBe('Followcast is already running (pid 1337)\n')
+
+    const fake = fakePorts()
+    const controller = new AbortController()
+    let acquired = false
+    const fgRunning = buildCliMain({
+      argv: ['--foreground'],
+      stdout: { write: () => {} },
+      stderr: { write: () => {} },
+      createPorts: () => fake.ports,
+      signal: controller.signal,
+      daemon: {
+        acquire: () => {
+          acquired = true
+          return () => {}
+        },
+        stop: () => false,
+        spawnDetached: () => {
+          throw new Error('should not detach in foreground mode')
+        },
+      },
+    })
+    await waitUntil(() => acquired)
+    controller.abort()
+    fake.events.close()
+    fake.ticks.close()
+    await expect(fgRunning).resolves.toBe(0)
+  })
 })
