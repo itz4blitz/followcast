@@ -311,7 +311,7 @@ def _run_surface() -> int:
             ("uFlags", wintypes.UINT),
             ("uCallbackMessage", wintypes.UINT),
             ("hIcon", wintypes.HICON),
-            ("szTip", wintypes.WCHAR * 128),
+            ("szTip", wintypes.WCHAR * 64),
         ]
 
     user32.DefWindowProcW.argtypes = [
