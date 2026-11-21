@@ -1,6 +1,7 @@
 export type SharePolicy = {
   readonly monitors: Readonly<Record<string, boolean>>
   readonly apps: Readonly<Record<string, boolean>>
+  readonly paused?: boolean
 }
 
 export const DEFAULT_POLICY: SharePolicy = {
@@ -31,14 +32,30 @@ export function parsePolicy(value: unknown): SharePolicy {
     throw new Error('policy: expected an object')
   }
   const record = value
-  return {
-    monitors: asFlagMap('monitors' in record ? record.monitors : undefined),
-    apps: asFlagMap('apps' in record ? record.apps : undefined),
+  const monitors = asFlagMap('monitors' in record ? record.monitors : undefined)
+  const apps = asFlagMap('apps' in record ? record.apps : undefined)
+  if ('paused' in record && record.paused === true) {
+    return { monitors, apps, paused: true }
   }
+  return { monitors, apps }
 }
 
 export function serializePolicy(policy: SharePolicy): string {
-  return `${JSON.stringify({ monitors: policy.monitors, apps: policy.apps }, null, 2)}\n`
+  const payload = isPaused(policy)
+    ? { monitors: policy.monitors, apps: policy.apps, paused: true }
+    : { monitors: policy.monitors, apps: policy.apps }
+  return `${JSON.stringify(payload, null, 2)}\n`
+}
+
+export function isPaused(policy: SharePolicy): boolean {
+  return policy.paused === true
+}
+
+export function setPaused(policy: SharePolicy, paused: boolean): SharePolicy {
+  if (paused) {
+    return { monitors: policy.monitors, apps: policy.apps, paused: true }
+  }
+  return { monitors: policy.monitors, apps: policy.apps }
 }
 
 export function isMonitorAllowed(policy: SharePolicy, name: string): boolean {
@@ -50,15 +67,17 @@ export function isAppAllowed(policy: SharePolicy, className: string): boolean {
 }
 
 export function toggleMonitor(policy: SharePolicy, name: string, enabled: boolean): SharePolicy {
-  return {
+  const next: SharePolicy = {
     monitors: { ...policy.monitors, [name]: enabled },
     apps: policy.apps,
   }
+  return isPaused(policy) ? { ...next, paused: true } : next
 }
 
 export function toggleApp(policy: SharePolicy, className: string, enabled: boolean): SharePolicy {
-  return {
+  const next: SharePolicy = {
     monitors: policy.monitors,
     apps: { ...policy.apps, [className]: enabled },
   }
+  return isPaused(policy) ? { ...next, paused: true } : next
 }

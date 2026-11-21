@@ -1,6 +1,13 @@
 import { startFollowcast } from '../app/followcast.ts'
-import { DEFAULT_POLICY, toggleApp, toggleMonitor, type SharePolicy } from '../domain/policy.ts'
-import { serializePolicy } from '../domain/policy.ts'
+import {
+  DEFAULT_POLICY,
+  isPaused,
+  serializePolicy,
+  setPaused,
+  toggleApp,
+  toggleMonitor,
+  type SharePolicy,
+} from '../domain/policy.ts'
 import { shareStatus } from '../domain/shareStatus.ts'
 import {
   DEFAULT_FOLLOW_OPTIONS,
@@ -15,6 +22,10 @@ export const USAGE = `followcast — share this window; it follows the focused d
 Usage:
   followcast
   followcast start
+  followcast stop
+  followcast hide
+  followcast resume
+  followcast toggle
   followcast --deny-class zoom --deny-class skype
   followcast policy
   followcast policy set-monitor <name> on|off
@@ -23,12 +34,17 @@ Usage:
   followcast --help
 
 In your share picker (Meet, Zoom, Discord), choose the window titled Followcast.
-Use \`followcast policy\` (or the Omarchy bar chip on Linux) to mute monitors or apps.
+Use \`followcast policy\`, \`followcast hide/resume/toggle\` (or Ctrl+Shift+H / tray menu on Windows) to control privacy.
 `
 
 export type PolicyIo = {
   read(): SharePolicy
   write(policy: SharePolicy): void
+}
+
+type DaemonIo = {
+  acquire(): () => void
+  stop(): boolean
 }
 
 export type CliIo = {
@@ -39,6 +55,7 @@ export type CliIo = {
   readonly signal: AbortSignal
   readonly policy?: PolicyIo
   readonly snapshot?: () => Promise<DesktopSnapshot>
+  readonly daemon?: DaemonIo
 }
 
 function formatError(error: unknown): string {
@@ -61,12 +78,17 @@ export async function buildCliMain(io: CliIo): Promise<number> {
   if (
     parsed.kind === 'policy-show' ||
     parsed.kind === 'policy-set-monitor' ||
-    parsed.kind === 'policy-set-app'
+    parsed.kind === 'policy-set-app' ||
+    parsed.kind === 'policy-set-paused' ||
+    parsed.kind === 'policy-toggle-paused'
   ) {
     return handlePolicy(io, parsed)
   }
   if (parsed.kind === 'status') {
     return handleStatus(io)
+  }
+  if (parsed.kind === 'stop') {
+    return handleStop(io)
   }
   const options: FollowOptions = {
     selfClasses: DEFAULT_FOLLOW_OPTIONS.selfClasses,
@@ -75,7 +97,9 @@ export async function buildCliMain(io: CliIo): Promise<number> {
     policy: io.policy?.read() ?? DEFAULT_POLICY,
     privacyRegion: null,
   }
+  let releaseLock: (() => void) | null = null
   try {
+    releaseLock = io.daemon?.acquire() ?? null
     const ports = io.createPorts(options)
     const handle = startFollowcast(
       ports,
@@ -90,6 +114,8 @@ export async function buildCliMain(io: CliIo): Promise<number> {
   } catch (error) {
     io.stderr.write(`${formatError(error)}\n`)
     return 1
+  } finally {
+    releaseLock?.()
   }
 }
 
@@ -97,7 +123,11 @@ function handlePolicy(
   io: CliIo,
   parsed: Extract<
     ReturnType<typeof parseArgs>,
-    { kind: 'policy-show' } | { kind: 'policy-set-monitor' } | { kind: 'policy-set-app' }
+    | { kind: 'policy-show' }
+    | { kind: 'policy-set-monitor' }
+    | { kind: 'policy-set-app' }
+    | { kind: 'policy-set-paused' }
+    | { kind: 'policy-toggle-paused' }
   >,
 ): number {
   const store = io.policy
@@ -110,12 +140,41 @@ function handlePolicy(
     return 0
   }
   const current = store.read()
-  const next =
-    parsed.kind === 'policy-set-monitor'
-      ? toggleMonitor(current, parsed.name, parsed.enabled)
-      : toggleApp(current, parsed.className, parsed.enabled)
+  const next = nextPolicy(current, parsed)
   store.write(next)
   io.stdout.write(serializePolicy(next))
+  return 0
+}
+
+function nextPolicy(
+  current: SharePolicy,
+  parsed: Extract<
+    ReturnType<typeof parseArgs>,
+    | { kind: 'policy-set-monitor' }
+    | { kind: 'policy-set-app' }
+    | { kind: 'policy-set-paused' }
+    | { kind: 'policy-toggle-paused' }
+  >,
+): SharePolicy {
+  if (parsed.kind === 'policy-set-monitor') {
+    return toggleMonitor(current, parsed.name, parsed.enabled)
+  }
+  if (parsed.kind === 'policy-set-app') {
+    return toggleApp(current, parsed.className, parsed.enabled)
+  }
+  if (parsed.kind === 'policy-set-paused') {
+    return setPaused(current, parsed.paused)
+  }
+  return setPaused(current, !isPaused(current))
+}
+
+function handleStop(io: CliIo): number {
+  if (io.daemon === undefined) {
+    io.stderr.write('daemon control is unavailable\n')
+    return 1
+  }
+  const stopped = io.daemon.stop()
+  io.stdout.write(stopped ? 'Followcast stopped.\n' : 'Followcast is not running.\n')
   return 0
 }
 

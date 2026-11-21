@@ -18,6 +18,61 @@ def normalize_device_name(device: str) -> str:
     return device
 
 
+_GENERIC_MONITOR_NAMES = frozenset({"generic pnp monitor", "generic non-pnp monitor"})
+
+
+def friendly_monitor_label(device_name: str, device_string: str) -> str:
+    short = normalize_device_name(device_name)
+    cleaned = device_string.strip()
+    if cleaned == "" or cleaned.lower() in _GENERIC_MONITOR_NAMES:
+        return short
+    return f"{cleaned} ({short})"
+
+
+def _query_monitor_friendly_name(device_name: str) -> str:
+    if sys.platform != "win32":
+        return ""
+    import ctypes
+    from ctypes import wintypes
+
+    class DISPLAY_DEVICEW(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("DeviceName", wintypes.WCHAR * 32),
+            ("DeviceString", wintypes.WCHAR * 128),
+            ("StateFlags", wintypes.DWORD),
+            ("DeviceID", wintypes.WCHAR * 128),
+            ("DeviceKey", wintypes.WCHAR * 128),
+        ]
+
+    user32 = ctypes.windll.user32
+    user32.EnumDisplayDevicesW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        ctypes.POINTER(DISPLAY_DEVICEW),
+        wintypes.DWORD,
+    ]
+    user32.EnumDisplayDevicesW.restype = wintypes.BOOL
+    dd = DISPLAY_DEVICEW()
+    dd.cb = ctypes.sizeof(DISPLAY_DEVICEW)
+    if user32.EnumDisplayDevicesW(device_name, 0, ctypes.byref(dd), 0):
+        return str(dd.DeviceString)
+    return ""
+
+
+def list_monitors_with_labels() -> list[dict[str, Any]]:
+    monitors = list_monitors()
+    labeled: list[dict[str, Any]] = []
+    for mon in monitors:
+        name = str(mon.get("name", ""))
+        device = f"\\\\.\\{name}" if not name.startswith("\\\\.\\") else name
+        desc = _query_monitor_friendly_name(device)
+        entry = dict(mon)
+        entry["label"] = friendly_monitor_label(name, desc)
+        labeled.append(entry)
+    return labeled
+
+
 def format_hwnd(hwnd: int) -> str:
     return f"0x{hwnd:x}"
 

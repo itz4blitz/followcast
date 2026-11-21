@@ -1,0 +1,20 @@
+{
+  "version": "0.6.0",
+  "description": "Cross-platform share window that always shows the keyboard-focused display, with per-monitor and per-app privacy cards.",
+  "homepage": "https://github.com/itz4blitz/followcast",
+  "license": "Apache-2.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/itz4blitz/followcast/releases/download/v0.6.0/followcast-win-x64.zip",
+      "bin": ["followcast.exe"]
+    }
+  },
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/itz4blitz/followcast/releases/download/v$version/followcast-win-x64.zip"
+      }
+    }
+  }
+}

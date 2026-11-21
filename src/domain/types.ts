@@ -56,7 +56,7 @@ export const DEFAULT_FOLLOW_OPTIONS: FollowOptions = {
 
 type HoldReason = 'self' | 'unmapped' | 'missing' | 'no-monitor'
 
-type PrivacyReason = 'monitor-off' | 'app-off'
+type PrivacyReason = 'monitor-off' | 'app-off' | 'paused'
 
 export type FollowRegion = {
   readonly output: string

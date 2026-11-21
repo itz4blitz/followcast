@@ -1,5 +1,5 @@
 import { monitorToRegion } from './geometry.ts'
-import { isAppAllowed, isMonitorAllowed } from './policy.ts'
+import { isAppAllowed, isMonitorAllowed, isPaused } from './policy.ts'
 import { isShareableOutput } from './shareableOutput.ts'
 import type {
   DesktopSnapshot,
@@ -31,6 +31,15 @@ function isSelf(window: WindowSnapshot, options: FollowOptions): boolean {
 }
 
 export function decideFollow(snapshot: DesktopSnapshot, options: FollowOptions): FollowDecision {
+  if (isPaused(options.policy)) {
+    return {
+      kind: 'privacy',
+      className: 'followcast.paused',
+      appLabel: 'Paused',
+      monitorName: '',
+      reason: 'paused',
+    }
+  }
   // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — findWindow never matches null, so the next missing return is identical
   if (snapshot.focusedAddress === null) {
     return { kind: 'hold', reason: 'missing' }

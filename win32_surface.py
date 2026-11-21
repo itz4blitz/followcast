@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from capture_argv import destination_output, parse_stream_output, stdin_line_iter
-from win32_desktop import FOLLOWCAST_SURFACE_CLASS, list_monitors
+from win32_desktop import (
+    FOLLOWCAST_SURFACE_CLASS,
+    list_clients,
+    list_monitors,
+    list_monitors_with_labels,
+)
 
 WIDTH = 1280
 HEIGHT = 720
@@ -31,6 +36,118 @@ def runtime_state_path(env: Mapping[str, str], fallback_temp: str) -> Path:
         or fallback_temp
     )
     return Path(runtime) / "followcast" / "privacy.json"
+
+
+def policy_file_path(env: Mapping[str, str], home: Path) -> Path:
+    base = env.get("XDG_CONFIG_HOME") or env.get("APPDATA")
+    if base:
+        return Path(base) / "followcast" / "policy.json"
+    return home / ".config" / "followcast" / "policy.json"
+
+
+def load_policy(raw: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"monitors": {}, "apps": {}}
+    if not isinstance(parsed, dict):
+        return {"monitors": {}, "apps": {}}
+    monitors_raw = parsed.get("monitors")
+    apps_raw = parsed.get("apps")
+    monitors = (
+        {k: v for k, v in monitors_raw.items() if isinstance(k, str) and isinstance(v, bool)}
+        if isinstance(monitors_raw, dict)
+        else {}
+    )
+    apps = (
+        {k: v for k, v in apps_raw.items() if isinstance(k, str) and isinstance(v, bool)}
+        if isinstance(apps_raw, dict)
+        else {}
+    )
+    result: dict[str, Any] = {"monitors": monitors, "apps": apps}
+    if parsed.get("paused") is True:
+        result["paused"] = True
+    return result
+
+
+def save_policy_atomic(path: Path, policy: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {
+        "monitors": policy.get("monitors", {}),
+        "apps": policy.get("apps", {}),
+    }
+    if policy.get("paused") is True:
+        payload["paused"] = True
+    staging = path.with_suffix(".json.tmp")
+    staging.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.replace(staging, path)
+
+
+def toggle_paused(policy: dict[str, Any]) -> dict[str, Any]:
+    next_policy: dict[str, Any] = {
+        "monitors": dict(policy.get("monitors", {})),
+        "apps": dict(policy.get("apps", {})),
+    }
+    if policy.get("paused") is not True:
+        next_policy["paused"] = True
+    return next_policy
+
+
+def toggle_policy_monitor(policy: dict[str, Any], name: str) -> dict[str, Any]:
+    monitors = dict(policy.get("monitors", {}))
+    monitors[name] = not monitors.get(name, True)
+    next_policy: dict[str, Any] = {
+        "monitors": monitors,
+        "apps": dict(policy.get("apps", {})),
+    }
+    if policy.get("paused") is True:
+        next_policy["paused"] = True
+    return next_policy
+
+
+def toggle_policy_app(policy: dict[str, Any], class_name: str) -> dict[str, Any]:
+    apps = dict(policy.get("apps", {}))
+    apps[class_name] = not apps.get(class_name, True)
+    next_policy: dict[str, Any] = {
+        "monitors": dict(policy.get("monitors", {})),
+        "apps": apps,
+    }
+    if policy.get("paused") is True:
+        next_policy["paused"] = True
+    return next_policy
+
+
+def fit_aspect_rect(
+    src_w: int,
+    src_h: int,
+    dst_w: int,
+    dst_h: int,
+) -> tuple[int, int, int, int]:
+    if src_w <= 0 or src_h <= 0 or dst_w <= 0 or dst_h <= 0:
+        return (0, 0, max(1, dst_w), max(1, dst_h))
+    scale = min(dst_w / src_w, dst_h / src_h)
+    w = max(1, min(dst_w, round(src_w * scale)))
+    h = max(1, min(dst_h, round(src_h * scale)))
+    x = (dst_w - w) // 2
+    y = (dst_h - h) // 2
+    return (x, y, w, h)
+
+
+def map_cursor_position(
+    cursor_x: int,
+    cursor_y: int,
+    mon_rect: tuple[int, int, int, int],
+    dst_rect: tuple[int, int, int, int],
+) -> tuple[int, int] | None:
+    mx, my, mw, mh = mon_rect
+    dx, dy, dw, dh = dst_rect
+    if mw <= 0 or mh <= 0:
+        return None
+    if cursor_x < mx or cursor_x >= mx + mw or cursor_y < my or cursor_y >= my + mh:
+        return None
+    rx = dx + round((cursor_x - mx) * dw / mw)
+    ry = dy + round((cursor_y - my) * dh / mh)
+    return (rx, ry)
 
 
 def parse_privacy_state(raw: str) -> dict[str, Any]:
@@ -74,6 +191,7 @@ def _run_surface() -> int:
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
     kernel32 = ctypes.windll.kernel32
+    shell32 = ctypes.windll.shell32
 
     WS_OVERLAPPEDWINDOW = 0x00CF0000
     WS_VISIBLE = 0x10000000
@@ -82,7 +200,33 @@ def _run_surface() -> int:
     WM_CLOSE = 0x0010
     WM_ERASEBKGND = 0x0014
     WM_TIMER = 0x0113
+    WM_HOTKEY = 0x0312
+    WM_APP = 0x8000
+    WM_TRAYICON = WM_APP + 1
+    WM_LBUTTONUP = 0x0202
+    WM_RBUTTONUP = 0x0205
+    WM_CONTEXTMENU = 0x007B
     TIMER_ID = 1
+    HOTKEY_HIDE_ID = 1
+    MOD_CONTROL = 0x0002
+    MOD_SHIFT = 0x0004
+    MOD_NOREPEAT = 0x4000
+    VK_H = 0x48
+    CURSOR_SHOWING = 0x00000001
+    DI_NORMAL = 0x0003
+    NIF_MESSAGE = 0x00000001
+    NIF_ICON = 0x00000002
+    NIF_TIP = 0x00000004
+    NIM_ADD = 0x00000000
+    NIM_MODIFY = 0x00000001
+    NIM_DELETE = 0x00000002
+    MF_STRING = 0x00000000
+    MF_SEPARATOR = 0x00000800
+    MF_GRAYED = 0x00000001
+    MF_CHECKED = 0x00000008
+    TPM_RIGHTBUTTON = 0x0002
+    TPM_RETURNCMD = 0x0100
+    SW_RESTORE = 9
     SRCCOPY = 0x00CC0020
     HALFTONE = 4
     DT_CENTER = 0x00000001
@@ -104,6 +248,9 @@ def _run_surface() -> int:
     KICKER_COLOR = rgb(0x9A, 0xA3, 0xB5)
     APP_COLOR = rgb(0xF4, 0xF6, 0xFB)
     DETAIL_COLOR = rgb(0xC5, 0xCD, 0xDB)
+    TRAY_LIVE_COLOR = rgb(0x22, 0xC5, 0x5E)
+    TRAY_HIDDEN_COLOR = rgb(0xF5, 0x9E, 0x0B)
+    TRAY_IDLE_COLOR = rgb(0x64, 0x74, 0x8B)
 
     WNDPROC = ctypes.WINFUNCTYPE(
         ctypes.c_ssize_t,
@@ -137,6 +284,34 @@ def _run_surface() -> int:
             ("fRestore", wintypes.BOOL),
             ("fIncUpdate", wintypes.BOOL),
             ("rgbReserved", wintypes.BYTE * 32),
+        ]
+
+    class CURSORINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("flags", wintypes.DWORD),
+            ("hCursor", wintypes.HANDLE),
+            ("ptScreenPos", wintypes.POINT),
+        ]
+
+    class ICONINFO(ctypes.Structure):
+        _fields_ = [
+            ("fIcon", wintypes.BOOL),
+            ("xHotspot", wintypes.DWORD),
+            ("yHotspot", wintypes.DWORD),
+            ("hbmMask", wintypes.HBITMAP),
+            ("hbmColor", wintypes.HBITMAP),
+        ]
+
+    class NOTIFYICONDATAW(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("hWnd", wintypes.HWND),
+            ("uID", wintypes.UINT),
+            ("uFlags", wintypes.UINT),
+            ("uCallbackMessage", wintypes.UINT),
+            ("hIcon", wintypes.HICON),
+            ("szTip", wintypes.WCHAR * 128),
         ]
 
     user32.DefWindowProcW.argtypes = [
@@ -271,15 +446,230 @@ def _run_surface() -> int:
         wintypes.LPCWSTR,
     ]
     gdi32.CreateFontW.restype = wintypes.HFONT
+    user32.GetCursorInfo.argtypes = [ctypes.POINTER(CURSORINFO)]
+    user32.GetCursorInfo.restype = wintypes.BOOL
+    user32.GetIconInfo.argtypes = [wintypes.HICON, ctypes.POINTER(ICONINFO)]
+    user32.GetIconInfo.restype = wintypes.BOOL
+    user32.DrawIconEx.argtypes = [
+        wintypes.HDC,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.HICON,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+        wintypes.HBRUSH,
+        wintypes.UINT,
+    ]
+    user32.DrawIconEx.restype = wintypes.BOOL
+    user32.CreateIconIndirect.argtypes = [ctypes.POINTER(ICONINFO)]
+    user32.CreateIconIndirect.restype = wintypes.HICON
+    user32.DestroyIcon.argtypes = [wintypes.HICON]
+    user32.DestroyIcon.restype = wintypes.BOOL
+    user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+    user32.RegisterHotKey.restype = wintypes.BOOL
+    user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.UnregisterHotKey.restype = wintypes.BOOL
+    user32.CreatePopupMenu.argtypes = []
+    user32.CreatePopupMenu.restype = wintypes.HMENU
+    user32.DestroyMenu.argtypes = [wintypes.HMENU]
+    user32.DestroyMenu.restype = wintypes.BOOL
+    user32.AppendMenuW.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_size_t, wintypes.LPCWSTR]
+    user32.AppendMenuW.restype = wintypes.BOOL
+    user32.TrackPopupMenu.argtypes = [
+        wintypes.HMENU,
+        wintypes.UINT,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.HWND,
+        ctypes.c_void_p,
+    ]
+    user32.TrackPopupMenu.restype = wintypes.BOOL
+    user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+    user32.GetCursorPos.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    gdi32.Ellipse.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+    gdi32.Ellipse.restype = wintypes.BOOL
+    gdi32.CreatePen.argtypes = [ctypes.c_int, ctypes.c_int, wintypes.COLORREF]
+    gdi32.CreatePen.restype = wintypes.HPEN
+    shell32.Shell_NotifyIconW.argtypes = [wintypes.DWORD, ctypes.POINTER(NOTIFYICONDATAW)]
+    shell32.Shell_NotifyIconW.restype = wintypes.BOOL
 
     lock = threading.Lock()
     state: dict[str, Any] = {
         "output": None,
         "monitors": list_monitors(),
         "monitors_at": time.monotonic(),
+        "tray_status": "idle",
     }
     hwnd_box: list[int] = [0]
     privacy_file = runtime_state_path(os.environ, tempfile.gettempdir())
+    policy_path = policy_file_path(os.environ, Path.home())
+
+    def create_dot_icon(color: int) -> int:
+        size = 16
+        screen_dc = user32.GetDC(0)
+        color_dc = gdi32.CreateCompatibleDC(screen_dc)
+        mask_dc = gdi32.CreateCompatibleDC(screen_dc)
+        color_bmp = gdi32.CreateCompatibleBitmap(screen_dc, size, size)
+        mask_bmp = gdi32.CreateCompatibleBitmap(mask_dc, size, size)
+        old_color = gdi32.SelectObject(color_dc, color_bmp)
+        old_mask = gdi32.SelectObject(mask_dc, mask_bmp)
+        try:
+            black_brush = gdi32.CreateSolidBrush(rgb(0, 0, 0))
+            white_brush = gdi32.CreateSolidBrush(rgb(255, 255, 255))
+            dot_brush = gdi32.CreateSolidBrush(color)
+            dot_pen = gdi32.CreatePen(0, 1, color)
+            full_rect = wintypes.RECT(0, 0, size, size)
+            user32.FillRect(color_dc, ctypes.byref(full_rect), black_brush)
+            user32.FillRect(mask_dc, ctypes.byref(full_rect), white_brush)
+            old_cb = gdi32.SelectObject(color_dc, dot_brush)
+            old_cp = gdi32.SelectObject(color_dc, dot_pen)
+            gdi32.Ellipse(color_dc, 2, 2, size - 2, size - 2)
+            gdi32.SelectObject(color_dc, old_cb)
+            gdi32.SelectObject(color_dc, old_cp)
+            old_mb = gdi32.SelectObject(mask_dc, black_brush)
+            gdi32.Ellipse(mask_dc, 2, 2, size - 2, size - 2)
+            gdi32.SelectObject(mask_dc, old_mb)
+            gdi32.DeleteObject(black_brush)
+            gdi32.DeleteObject(white_brush)
+            gdi32.DeleteObject(dot_brush)
+            gdi32.DeleteObject(dot_pen)
+            ii = ICONINFO()
+            ii.fIcon = True
+            ii.xHotspot = 0
+            ii.yHotspot = 0
+            ii.hbmMask = mask_bmp
+            ii.hbmColor = color_bmp
+            return int(user32.CreateIconIndirect(ctypes.byref(ii)) or 0)
+        finally:
+            gdi32.SelectObject(color_dc, old_color)
+            gdi32.SelectObject(mask_dc, old_mask)
+            gdi32.DeleteObject(color_bmp)
+            gdi32.DeleteObject(mask_bmp)
+            gdi32.DeleteDC(color_dc)
+            gdi32.DeleteDC(mask_dc)
+            user32.ReleaseDC(0, screen_dc)
+
+    tray_icons = {
+        "live": create_dot_icon(TRAY_LIVE_COLOR),
+        "hidden": create_dot_icon(TRAY_HIDDEN_COLOR),
+        "idle": create_dot_icon(TRAY_IDLE_COLOR),
+    }
+
+    def read_policy_disk() -> dict[str, Any]:
+        if not policy_path.exists():
+            return {"monitors": {}, "apps": {}}
+        try:
+            return load_policy(policy_path.read_text(encoding="utf-8"))
+        except OSError:
+            return {"monitors": {}, "apps": {}}
+
+    def update_tray_status(hwnd: int, status_kind: str) -> None:
+        if state["tray_status"] == status_kind:
+            return
+        state["tray_status"] = status_kind
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+        nid.hWnd = hwnd
+        nid.uID = 1
+        nid.uFlags = NIF_ICON | NIF_TIP
+        nid.hIcon = tray_icons.get(status_kind, tray_icons["idle"])
+        labels = {
+            "live": "Followcast — Live",
+            "hidden": "Followcast — Hidden",
+            "idle": "Followcast — Idle",
+        }
+        nid.szTip = labels.get(status_kind, "Followcast")
+        shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
+
+    def show_tray_menu(hwnd: int) -> None:
+        menu = user32.CreatePopupMenu()
+        if not menu:
+            return
+        try:
+            policy = read_policy_disk()
+            is_paused = policy.get("paused") is True
+            status_label = {
+                "live": "Followcast — Live",
+                "hidden": "Followcast — Hidden",
+                "idle": "Followcast — Idle",
+            }.get(str(state["tray_status"]), "Followcast")
+            user32.AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, status_label)
+            user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+            pause_text = "Resume Share (Ctrl+Shift+H)" if is_paused else "Hide Share (Ctrl+Shift+H)"
+            user32.AppendMenuW(menu, MF_STRING, 1, pause_text)
+
+            cmd_actions: dict[int, tuple[str, str]] = {}
+            next_id = 100
+
+            monitors = list_monitors_with_labels()
+            if monitors:
+                user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+                for mon in monitors:
+                    name = str(mon.get("name", ""))
+                    label = str(mon.get("label", name))
+                    enabled = policy.get("monitors", {}).get(name, True)
+                    flags = MF_STRING | (MF_CHECKED if enabled else 0)
+                    user32.AppendMenuW(menu, flags, next_id, f"Monitor: {label}")
+                    cmd_actions[next_id] = ("monitor", name)
+                    next_id += 1
+
+            clients = list_clients()
+            seen_apps: set[str] = set()
+            app_names: list[str] = []
+            for client in clients:
+                cls = str(client.get("class", ""))
+                if cls == "" or cls == "followcast.surface" or cls in seen_apps:
+                    continue
+                seen_apps.add(cls)
+                app_names.append(cls)
+            if app_names:
+                user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+                for cls in sorted(app_names, key=str.lower)[:12]:
+                    enabled = policy.get("apps", {}).get(cls, True)
+                    flags = MF_STRING | (MF_CHECKED if enabled else 0)
+                    user32.AppendMenuW(menu, flags, next_id, f"App: {cls}")
+                    cmd_actions[next_id] = ("app", cls)
+                    next_id += 1
+
+            user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+            user32.AppendMenuW(menu, MF_STRING, 2, "Show Followcast Window")
+            user32.AppendMenuW(menu, MF_STRING, 3, "Quit Followcast")
+
+            pt = wintypes.POINT()
+            user32.GetCursorPos(ctypes.byref(pt))
+            user32.SetForegroundWindow(hwnd)
+            chosen = int(
+                user32.TrackPopupMenu(
+                    menu,
+                    TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                    pt.x,
+                    pt.y,
+                    0,
+                    hwnd,
+                    None,
+                )
+            )
+            if chosen == 1:
+                save_policy_atomic(policy_path, toggle_paused(policy))
+            elif chosen == 2:
+                user32.ShowWindow(hwnd, SW_RESTORE)
+                user32.SetForegroundWindow(hwnd)
+            elif chosen == 3:
+                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            elif chosen in cmd_actions:
+                kind, target = cmd_actions[chosen]
+                if kind == "monitor":
+                    save_policy_atomic(policy_path, toggle_policy_monitor(policy, target))
+                elif kind == "app":
+                    save_policy_atomic(policy_path, toggle_policy_app(policy, target))
+        finally:
+            user32.DestroyMenu(menu)
 
     bg_brush = gdi32.CreateSolidBrush(BG_COLOR)
     kicker_font = gdi32.CreateFontW(
@@ -372,25 +762,68 @@ def _run_surface() -> int:
                         with lock:
                             state["output"] = dest
                 if privacy.get("visible") and privacy.get("appLabel"):
+                    update_tray_status(hwnd, "hidden")
                     draw_privacy_card(mem_dc, cw, ch, str(privacy["appLabel"]))
                 else:
                     with lock:
                         output = state["output"]
                     rect = get_monitor_rect(output)
+                    full = wintypes.RECT(0, 0, cw, ch)
+                    user32.FillRect(mem_dc, ctypes.byref(full), bg_brush)
                     if rect is None:
-                        full = wintypes.RECT(0, 0, cw, ch)
-                        user32.FillRect(mem_dc, ctypes.byref(full), bg_brush)
+                        update_tray_status(hwnd, "idle")
                     else:
+                        update_tray_status(hwnd, "live")
                         mx, my, mw, mh = rect
+                        dx, dy, dw, dh = fit_aspect_rect(mw, mh, cw, ch)
                         screen_dc = user32.GetDC(0)
                         try:
                             gdi32.SetStretchBltMode(mem_dc, HALFTONE)
                             gdi32.SetBrushOrgEx(mem_dc, 0, 0, None)
                             gdi32.StretchBlt(
-                                mem_dc, 0, 0, cw, ch,
+                                mem_dc, dx, dy, dw, dh,
                                 screen_dc, mx, my, mw, mh,
                                 SRCCOPY,
                             )
+                            ci = CURSORINFO()
+                            ci.cbSize = ctypes.sizeof(CURSORINFO)
+                            if (
+                                user32.GetCursorInfo(ctypes.byref(ci))
+                                and (ci.flags & CURSOR_SHOWING)
+                                and ci.hCursor
+                            ):
+                                mapped = map_cursor_position(
+                                    int(ci.ptScreenPos.x),
+                                    int(ci.ptScreenPos.y),
+                                    (mx, my, mw, mh),
+                                    (dx, dy, dw, dh),
+                                )
+                                if mapped is not None:
+                                    hot_x = 0
+                                    hot_y = 0
+                                    ii = ICONINFO()
+                                    if user32.GetIconInfo(ci.hCursor, ctypes.byref(ii)):
+                                        hot_x = int(ii.xHotspot)
+                                        hot_y = int(ii.yHotspot)
+                                        if ii.hbmMask:
+                                            gdi32.DeleteObject(ii.hbmMask)
+                                        if ii.hbmColor:
+                                            gdi32.DeleteObject(ii.hbmColor)
+                                    scale = min(dw / max(1, mw), dh / max(1, mh))
+                                    cur_size = max(12, round(32 * scale))
+                                    cx = mapped[0] - round(hot_x * scale)
+                                    cy = mapped[1] - round(hot_y * scale)
+                                    user32.DrawIconEx(
+                                        mem_dc,
+                                        cx,
+                                        cy,
+                                        ci.hCursor,
+                                        cur_size,
+                                        cur_size,
+                                        0,
+                                        None,
+                                        DI_NORMAL,
+                                    )
                         finally:
                             user32.ReleaseDC(0, screen_dc)
                 gdi32.BitBlt(hdc, 0, 0, cw, ch, mem_dc, 0, 0, SRCCOPY)
@@ -410,11 +843,25 @@ def _run_surface() -> int:
         if msg == WM_PAINT:
             paint_window(hwnd)
             return 0
+        if msg == WM_HOTKEY and wparam == HOTKEY_HIDE_ID:
+            save_policy_atomic(policy_path, toggle_paused(read_policy_disk()))
+            return 0
+        if msg == WM_TRAYICON:
+            event_code = lparam & 0xFFFF
+            if event_code in (WM_RBUTTONUP, WM_LBUTTONUP, WM_CONTEXTMENU):
+                show_tray_menu(hwnd)
+            return 0
         if msg == WM_CLOSE:
             user32.DestroyWindow(hwnd)
             return 0
         if msg == WM_DESTROY:
             user32.KillTimer(hwnd, TIMER_ID)
+            user32.UnregisterHotKey(hwnd, HOTKEY_HIDE_ID)
+            nid = NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+            nid.hWnd = hwnd
+            nid.uID = 1
+            shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
             user32.PostQuitMessage(0)
             return 0
         return int(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
@@ -457,6 +904,17 @@ def _run_surface() -> int:
 
     hwnd_box[0] = int(hwnd or 0)
     user32.SetTimer(hwnd, TIMER_ID, FRAME_INTERVAL_MS, None)
+    user32.RegisterHotKey(hwnd, HOTKEY_HIDE_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_H)
+
+    nid = NOTIFYICONDATAW()
+    nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+    nid.hWnd = hwnd
+    nid.uID = 1
+    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+    nid.uCallbackMessage = WM_TRAYICON
+    nid.hIcon = tray_icons["idle"]
+    nid.szTip = "Followcast — Idle"
+    shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
 
     def _read_stdin() -> None:
         for raw in stdin_line_iter(sys.stdin.fileno()):
@@ -476,6 +934,9 @@ def _run_surface() -> int:
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
     finally:
+        for icon in tray_icons.values():
+            if icon:
+                user32.DestroyIcon(icon)
         gdi32.DeleteObject(bg_brush)
         gdi32.DeleteObject(kicker_font)
         gdi32.DeleteObject(app_font)

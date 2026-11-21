@@ -94,9 +94,15 @@ followcast --deny-class zoom --deny-class skype
 3. Switch focus across monitors as usual. Followcast follows the focused display whenever
    both the monitor and active app are allowed by your policy. When a monitor or app is
    muted, the same **Followcast** window switches to the **Hidden by Followcast** card.
-4. Inspect live state or toggle privacy rules from any terminal:
+4. Inspect live state, pause/hide instantly, or toggle privacy rules from any terminal:
 
 ```bash
+# Instant manual privacy card (also Ctrl+Shift+H or tray menu on Windows)
+followcast hide
+followcast resume
+followcast toggle
+followcast stop
+
 # Linux example
 followcast policy set-monitor HDMI-A-1 off
 followcast policy set-app slack off

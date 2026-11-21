@@ -1,5 +1,5 @@
 import { decideFollow } from './decide.ts'
-import { isAppAllowed, isMonitorAllowed } from './policy.ts'
+import { isAppAllowed, isMonitorAllowed, isPaused } from './policy.ts'
 import type { DesktopSnapshot, FollowDecision, FollowOptions, WindowSnapshot } from './types.ts'
 
 type AppStatus = {
@@ -16,6 +16,7 @@ type MonitorStatus = {
 
 export type ShareStatus = {
   readonly decision: FollowDecision
+  readonly paused: boolean
   readonly monitors: readonly MonitorStatus[]
 }
 
@@ -29,6 +30,7 @@ function isSelfWindow(window: WindowSnapshot, options: FollowOptions): boolean {
 export function shareStatus(snapshot: DesktopSnapshot, options: FollowOptions): ShareStatus {
   return {
     decision: decideFollow(snapshot, options),
+    paused: isPaused(options.policy),
     monitors: snapshot.monitors.map((monitor) => {
       const apps: AppStatus[] = []
       for (const window of snapshot.windows) {

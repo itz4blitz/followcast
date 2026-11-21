@@ -1,0 +1,26 @@
+# Maintainer: itz4blitz <https://github.com/itz4blitz/followcast>
+pkgname=followcast-bin
+pkgver=0.6.0
+pkgrel=1
+pkgdesc='Cross-platform share window for Hyprland that follows the focused display with privacy cards'
+arch=('x86_64')
+url='https://github.com/itz4blitz/followcast'
+license=('Apache-2.0')
+depends=('grim' 'python-gobject' 'gtk4')
+provides=('followcast')
+conflicts=('followcast')
+source=("followcast-${pkgver}.tar.gz::https://github.com/itz4blitz/followcast/releases/download/v${pkgver}/followcast-linux-x64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -dm755 "${pkgdir}/usr/lib/followcast"
+  install -dm755 "${pkgdir}/usr/bin"
+  install -m755 "${srcdir}/followcast" "${pkgdir}/usr/lib/followcast/followcast"
+  install -m644 "${srcdir}/privacy-card.py" "${pkgdir}/usr/lib/followcast/privacy-card.py"
+  install -m644 "${srcdir}/capture_argv.py" "${pkgdir}/usr/lib/followcast/capture_argv.py"
+  if [ -d "${srcdir}/omarchy-plugin" ]; then
+    cp -r "${srcdir}/omarchy-plugin" "${pkgdir}/usr/lib/followcast/omarchy-plugin"
+  fi
+  ln -s /usr/lib/followcast/followcast "${pkgdir}/usr/bin/followcast"
+  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

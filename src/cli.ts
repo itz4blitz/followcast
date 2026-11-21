@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createConnection } from 'node:net'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { filePrivacyCard } from './cli/cardPublisher.ts'
 import { buildCliMain } from './cli/cliMain.ts'
 import { diskPolicy } from './cli/diskPolicy.ts'
+import { acquirePidLock, pidFilePath, stopRunningDaemon, type PidLockIo } from './cli/pidLock.ts'
 import { runtimeDirFromEnv } from './cli/policyStore.ts'
 import { dummySurfaceEnv } from './cli/privacyCardProcess.ts'
 import { nodeSchedule } from './clock/interval.ts'
@@ -150,6 +151,39 @@ async function main(): Promise<void> {
   const runtimeDir = runtimeDirFromEnv(process.env, tmpdir())
   const privacyCard = filePrivacyCard(runtimeDir)
   const isWindows = process.platform === 'win32'
+  const lockPath = pidFilePath(runtimeDir)
+  const pidLockIo: PidLockIo = {
+    readFile: (path) => {
+      try {
+        return readFileSync(path, 'utf8')
+      } catch {
+        return null
+      }
+    },
+    writeFile: (path, content) => {
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, content)
+    },
+    removeFile: (path) => {
+      rmSync(path, { force: true })
+    },
+    isAlive: (pid) => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    },
+    killPid: (pid) => {
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        // Process already exited.
+      }
+    },
+    currentPid: process.pid,
+  }
 
   const win32DesktopScript = join(packageRoot, 'win32_desktop.py')
   const win32SurfaceScript = join(packageRoot, 'win32_surface.py')
@@ -178,6 +212,10 @@ async function main(): Promise<void> {
     stdout: process.stdout,
     stderr: process.stderr,
     policy,
+    daemon: {
+      acquire: () => acquirePidLock(lockPath, pidLockIo),
+      stop: () => stopRunningDaemon(lockPath, pidLockIo),
+    },
     snapshot: async () =>
       toDesktopSnapshot(
         await snapshotPort.clients(),

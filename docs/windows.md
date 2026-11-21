@@ -79,6 +79,14 @@ followcast policy set-app Discord on
 - **Policy file**: `%APPDATA%\followcast\policy.json` (or `$XDG_CONFIG_HOME/followcast/policy.json` if set)
 - **Runtime privacy card state**: `%LOCALAPPDATA%\followcast\privacy.json` (fallback: `%TEMP%\followcast\privacy.json`)
 
+## System Tray Switchboard & Hotkey
+
+When running on Windows, Followcast adds a **system tray icon** (green = Live, amber = Hidden/Paused, gray = Idle):
+
+- **Click or right-click the tray icon** to hide/resume sharing, toggle individual monitors (with friendly display names), toggle open apps, show the window, or quit.
+- Press **`Ctrl+Shift+H`** anywhere to instantly toggle the **Hidden by Followcast** privacy card.
+- You can also control it from any terminal: `followcast hide`, `followcast resume`, `followcast toggle`, `followcast stop`.
+
 ## WidBar Taskbar Widget (Windows 11)
 
 Followcast ships a native Windows 11 [WidBar](https://apps.microsoft.com/detail/9PKLDNM83TP9)
@@ -102,6 +110,6 @@ and toggle monitors or apps with a click. See [widbar-plugin/README.md](../widba
   - Tracks foreground focus changes immediately via `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)`
     in `events` mode and serves low-latency JSON queries over stdio in `serve` mode.
 - **`win32_surface.py`**:
-  - Registers a native Win32 window (`FollowcastSurface` class, titled `Followcast`).
-  - Captures the focused monitor via double-buffered Win32 GDI `StretchBlt` (`HALFTONE`).
-  - Renders the branded **Hidden by Followcast** card natively when a monitor or app is muted.
+  - Registers a native Win32 window (`FollowcastSurface` class, titled `Followcast`), a system tray icon with right-click switchboard, and a global `Ctrl+Shift+H` privacy hotkey.
+  - Captures the focused monitor via double-buffered Win32 GDI `StretchBlt` (`HALFTONE`) with aspect-ratio-preserving letterboxing/pillarboxing and live mouse cursor compositing (`GetCursorInfo` + `DrawIconEx`).
+  - Renders the branded **Hidden by Followcast** card natively when a monitor, app, or manual pause is active.

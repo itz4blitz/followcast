@@ -2,9 +2,12 @@ export type ParsedArgs =
   | { readonly kind: 'help' }
   | { readonly kind: 'run'; readonly denyClasses: readonly string[] }
   | { readonly kind: 'status' }
+  | { readonly kind: 'stop' }
   | { readonly kind: 'policy-show' }
   | { readonly kind: 'policy-set-monitor'; readonly name: string; readonly enabled: boolean }
   | { readonly kind: 'policy-set-app'; readonly className: string; readonly enabled: boolean }
+  | { readonly kind: 'policy-set-paused'; readonly paused: boolean }
+  | { readonly kind: 'policy-toggle-paused' }
   | { readonly kind: 'error'; readonly message: string }
 
 function parseSwitch(value: string | undefined): boolean | null {
@@ -17,12 +20,28 @@ function parseSwitch(value: string | undefined): boolean | null {
   return null
 }
 
+function noExtraArgs(argv: readonly string[], result: ParsedArgs): ParsedArgs {
+  if (argv.length !== 1) {
+    return { kind: 'error', message: `unknown argument: ${String(argv[1])}` }
+  }
+  return result
+}
+
 export function parseArgs(argv: readonly string[]): ParsedArgs {
   if (argv[0] === 'status') {
-    if (argv.length !== 1) {
-      return { kind: 'error', message: 'unknown argument: ' + String(argv[1]) }
-    }
-    return { kind: 'status' }
+    return noExtraArgs(argv, { kind: 'status' })
+  }
+  if (argv[0] === 'hide') {
+    return noExtraArgs(argv, { kind: 'policy-set-paused', paused: true })
+  }
+  if (argv[0] === 'resume') {
+    return noExtraArgs(argv, { kind: 'policy-set-paused', paused: false })
+  }
+  if (argv[0] === 'toggle') {
+    return noExtraArgs(argv, { kind: 'policy-toggle-paused' })
+  }
+  if (argv[0] === 'stop') {
+    return noExtraArgs(argv, { kind: 'stop' })
   }
   if (argv[0] === 'policy') {
     if (argv.length === 1) {

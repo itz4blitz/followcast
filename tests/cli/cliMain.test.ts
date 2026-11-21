@@ -419,4 +419,119 @@ describe('buildCliMain', () => {
     expect(code).toBe(1)
     expect(stderr.join('')).toContain('HYPRLAND_INSTANCE_SIGNATURE')
   })
+
+  it('hides, resumes, and toggles manual privacy mode via policy store', async () => {
+    let stored: SharePolicy = DEFAULT_POLICY
+    const stdout: string[] = []
+    const base = {
+      stdout: { write: (chunk: string) => stdout.push(chunk) },
+      stderr: { write: () => {} },
+      createPorts: () => {
+        throw new Error('should not start')
+      },
+      signal: new AbortController().signal,
+      policy: {
+        read: () => stored,
+        write: (next: SharePolicy) => {
+          stored = next
+        },
+      },
+    }
+    expect(await buildCliMain({ ...base, argv: ['hide'] })).toBe(0)
+    expect(stored.paused).toBe(true)
+    expect(stdout.join('')).toContain('"paused": true')
+
+    stdout.length = 0
+    expect(await buildCliMain({ ...base, argv: ['hide'] })).toBe(0)
+    expect(stored.paused).toBe(true)
+
+    stdout.length = 0
+    expect(await buildCliMain({ ...base, argv: ['resume'] })).toBe(0)
+    expect(stored.paused).toBeUndefined()
+    expect(stdout.join('')).not.toContain('"paused"')
+
+    stdout.length = 0
+    expect(await buildCliMain({ ...base, argv: ['resume'] })).toBe(0)
+    expect(stored.paused).toBeUndefined()
+
+    stdout.length = 0
+    expect(await buildCliMain({ ...base, argv: ['toggle'] })).toBe(0)
+    expect(stored.paused).toBe(true)
+
+    stdout.length = 0
+    expect(await buildCliMain({ ...base, argv: ['toggle'] })).toBe(0)
+    expect(stored.paused).toBeUndefined()
+  })
+
+  it('stops a running daemon or reports when none is running', async () => {
+    const stdout: string[] = []
+    const stderr: string[] = []
+    const base = {
+      stdout: { write: (chunk: string) => stdout.push(chunk) },
+      stderr: { write: (chunk: string) => stderr.push(chunk) },
+      createPorts: () => {
+        throw new Error('should not start')
+      },
+      signal: new AbortController().signal,
+    }
+    expect(await buildCliMain({ ...base, argv: ['stop'] })).toBe(1)
+    expect(stderr.join('')).toBe('daemon control is unavailable\n')
+
+    stdout.length = 0
+    stderr.length = 0
+    expect(
+      await buildCliMain({
+        ...base,
+        argv: ['stop'],
+        daemon: {
+          acquire: () => () => {},
+          stop: () => true,
+        },
+      }),
+    ).toBe(0)
+    expect(stdout.join('')).toBe('Followcast stopped.\n')
+
+    stdout.length = 0
+    expect(
+      await buildCliMain({
+        ...base,
+        argv: ['stop'],
+        daemon: {
+          acquire: () => () => {},
+          stop: () => false,
+        },
+      }),
+    ).toBe(0)
+    expect(stdout.join('')).toBe('Followcast is not running.\n')
+  })
+
+  it('acquires and releases the daemon lock around a run', async () => {
+    const fake = fakePorts()
+    const controller = new AbortController()
+    let acquired = false
+    let released = false
+    const running = buildCliMain({
+      argv: [],
+      stdout: { write: () => {} },
+      stderr: { write: () => {} },
+      daemon: {
+        acquire: () => {
+          acquired = true
+          return () => {
+            released = true
+          }
+        },
+        stop: () => false,
+      },
+      createPorts: () => fake.ports,
+      signal: controller.signal,
+    })
+    await waitUntil(() => acquired)
+    expect(released).toBe(false)
+    controller.abort()
+    fake.events.close()
+    fake.ticks.close()
+    await expect(running).resolves.toBe(0)
+    expect(released).toBe(true)
+  })
 })

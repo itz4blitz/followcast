@@ -214,6 +214,21 @@ describe('decideFollow', () => {
     })
   })
 
+  it('shows the privacy card when sharing is manually paused', () => {
+    expect(
+      decideFollow(
+        desktop({ focusedAddress: null, windows: [] }),
+        options({ policy: { monitors: {}, apps: {}, paused: true } }),
+      ),
+    ).toEqual({
+      kind: 'privacy',
+      className: 'followcast.paused',
+      appLabel: 'Paused',
+      monitorName: '',
+      reason: 'paused',
+    })
+  })
+
   it('follows a window on a second monitor when keyboard focus lands there', () => {
     const hdmi = monitor({ id: 1, name: 'HDMI-A-1', x: 1600, y: 0 })
     const code = windowSnap({

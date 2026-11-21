@@ -26,6 +26,7 @@ describe('shareStatus', () => {
       }),
     )
     expect(status.decision.kind).toBe('privacy')
+    expect(status.paused).toBe(false)
     expect(status.monitors).toEqual([
       {
         name: 'DP-1',
@@ -97,5 +98,14 @@ describe('shareStatus', () => {
       { className: 'firefox', title: 'another tab', enabled: true },
       { className: 'secret', title: 'secret', enabled: true },
     ])
+  })
+
+  it('reports paused true when the policy is paused', () => {
+    const status = shareStatus(
+      { focusedAddress: null, windows: [], monitors: [monitor()] },
+      options({ policy: { monitors: {}, apps: {}, paused: true } }),
+    )
+    expect(status.paused).toBe(true)
+    expect(status.decision.kind).toBe('privacy')
   })
 })

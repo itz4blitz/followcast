@@ -3,8 +3,10 @@ import {
   DEFAULT_POLICY,
   isAppAllowed,
   isMonitorAllowed,
+  isPaused,
   parsePolicy,
   serializePolicy,
+  setPaused,
   toggleApp,
   toggleMonitor,
 } from '../../src/domain/policy.ts'
@@ -87,5 +89,22 @@ describe('serializePolicy', () => {
   it('round-trips flags', () => {
     const policy = toggleApp(toggleMonitor(DEFAULT_POLICY, 'HDMI-A-1', false), 'slack', false)
     expect(parsePolicy(JSON.parse(serializePolicy(policy)))).toEqual(policy)
+  })
+
+  it('round-trips paused state and preserves it across monitor/app toggles', () => {
+    expect(isPaused(DEFAULT_POLICY)).toBe(false)
+    const paused = setPaused(DEFAULT_POLICY, true)
+    expect(isPaused(paused)).toBe(true)
+    expect(parsePolicy(JSON.parse(serializePolicy(paused)))).toEqual(paused)
+    expect(isPaused(toggleMonitor(paused, 'DP-1', false))).toBe(true)
+    expect(isPaused(toggleApp(paused, 'slack', false))).toBe(true)
+    const resumed = setPaused(paused, false)
+    expect(isPaused(resumed)).toBe(false)
+    expect(
+      setPaused({ monitors: { 'DP-1': false }, apps: { slack: false }, paused: true }, false),
+    ).toEqual({ monitors: { 'DP-1': false }, apps: { slack: false } })
+    expect(parsePolicy({ paused: 'yes' })).toEqual({ monitors: {}, apps: {} })
+    expect(parsePolicy({ paused: false })).toEqual({ monitors: {}, apps: {} })
+    expect(parsePolicy({ paused: true })).toEqual({ monitors: {}, apps: {}, paused: true })
   })
 })
