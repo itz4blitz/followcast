@@ -11,9 +11,12 @@ from win32_desktop import (
 )
 from win32_surface import (
     fit_aspect_rect,
+    format_update_prompt,
+    is_newer_version,
     load_policy,
     map_cursor_position,
     parse_privacy_state,
+    parse_semver,
     policy_file_path,
     resolve_monitor_rect,
     runtime_state_path,
@@ -182,6 +185,17 @@ class Win32SurfaceHelpersTest(unittest.TestCase):
         self.assertFalse(p5["apps"]["Discord"])
         p6 = toggle_policy_app(p5, "Discord")
         self.assertTrue(p6["apps"]["Discord"])
+
+    def test_semver_comparison_and_update_prompt(self) -> None:
+        self.assertEqual(parse_semver("v0.6.1"), (0, 6, 1))
+        self.assertIsNone(parse_semver("bad"))
+        self.assertTrue(is_newer_version("0.6.1", "v0.6.2"))
+        self.assertFalse(is_newer_version("0.6.2", "v0.6.1"))
+        self.assertFalse(is_newer_version("0.6.1", "v0.6.1"))
+        self.assertEqual(
+            format_update_prompt("v0.7.0"),
+            "A new version of Followcast is available (v0.7.0). Would you like to upgrade?",
+        )
 
 
 if __name__ == "__main__":

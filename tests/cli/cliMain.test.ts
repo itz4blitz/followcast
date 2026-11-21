@@ -534,4 +534,114 @@ describe('buildCliMain', () => {
     await expect(running).resolves.toBe(0)
     expect(released).toBe(true)
   })
+
+  it('prints version for --version', async () => {
+    const stdout: string[] = []
+    const code = await buildCliMain({
+      argv: ['--version'],
+      stdout: { write: (chunk) => stdout.push(chunk) },
+      stderr: { write: () => {} },
+      createPorts: () => {
+        throw new Error('should not start')
+      },
+      signal: new AbortController().signal,
+      version: '0.6.1',
+    })
+    expect(code).toBe(0)
+    expect(stdout.join('')).toBe('0.6.1\n')
+
+    stdout.length = 0
+    const fallbackCode = await buildCliMain({
+      argv: ['-v'],
+      stdout: { write: (chunk) => stdout.push(chunk) },
+      stderr: { write: () => {} },
+      createPorts: () => {
+        throw new Error('should not start')
+      },
+      signal: new AbortController().signal,
+    })
+    expect(fallbackCode).toBe(0)
+    expect(stdout.join('')).toBe('0.0.0\n')
+  })
+
+  it('handles update when unavailable, up to date, newer, or failing', async () => {
+    const stdout: string[] = []
+    const stderr: string[] = []
+    const base = {
+      argv: ['update'],
+      stdout: { write: (chunk: string) => stdout.push(chunk) },
+      stderr: { write: (chunk: string) => stderr.push(chunk) },
+      createPorts: () => {
+        throw new Error('should not start')
+      },
+      signal: new AbortController().signal,
+      version: '0.6.1',
+    }
+    expect(await buildCliMain(base)).toBe(1)
+    expect(stderr.join('')).toBe('update is unavailable\n')
+
+    stdout.length = 0
+    stderr.length = 0
+    const applied: string[] = []
+    expect(
+      await buildCliMain({
+        ...base,
+        updater: {
+          fetchLatest: async () => 'v0.6.1',
+          apply: async (tag) => {
+            applied.push(tag)
+          },
+        },
+      }),
+    ).toBe(0)
+    expect(stdout.join('')).toBe('Followcast is up to date (v0.6.1).\n')
+    expect(applied).toEqual([])
+
+    stdout.length = 0
+    expect(
+      await buildCliMain({
+        ...base,
+        updater: {
+          fetchLatest: async () => 'v0.7.0',
+          apply: async (tag) => {
+            applied.push(tag)
+          },
+        },
+      }),
+    ).toBe(0)
+    expect(stdout.join('')).toBe('Upgraded Followcast to v0.7.0.\n')
+    expect(applied).toEqual(['v0.7.0'])
+
+    stdout.length = 0
+    expect(
+      await buildCliMain({
+        argv: ['update'],
+        stdout: { write: (chunk: string) => stdout.push(chunk) },
+        stderr: { write: () => {} },
+        createPorts: () => {
+          throw new Error('should not start')
+        },
+        signal: new AbortController().signal,
+        updater: {
+          fetchLatest: async () => 'v0.0.0',
+          apply: async () => {},
+        },
+      }),
+    ).toBe(0)
+    expect(stdout.join('')).toBe('Followcast is up to date (v0.0.0).\n')
+
+    stderr.length = 0
+    expect(
+      await buildCliMain({
+        ...base,
+        updater: {
+          fetchLatest: async () => {
+            throw new Error('network down')
+          },
+          apply: async () => {},
+        },
+      }),
+    ).toBe(1)
+    expect(stderr.join('')).toBe('network down\n')
+  })
 })

@@ -1,6 +1,6 @@
 #define MyAppName "Followcast"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.6.1"
+  #define MyAppVersion "0.6.2"
 #endif
 #define MyAppPublisher "itz4blitz"
 #define MyAppURL "https://github.com/itz4blitz/followcast"

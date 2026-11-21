@@ -127,6 +127,9 @@ describe('parseArgs', () => {
     expect(parseArgs(['resume'])).toEqual({ kind: 'policy-set-paused', paused: false })
     expect(parseArgs(['toggle'])).toEqual({ kind: 'policy-toggle-paused' })
     expect(parseArgs(['stop'])).toEqual({ kind: 'stop' })
+    expect(parseArgs(['update'])).toEqual({ kind: 'update' })
+    expect(parseArgs(['--version'])).toEqual({ kind: 'version' })
+    expect(parseArgs(['-v'])).toEqual({ kind: 'version' })
   })
 
   it('rejects leftover words after hide, resume, toggle, and stop', () => {
@@ -143,6 +146,18 @@ describe('parseArgs', () => {
       message: 'unknown argument: extra',
     })
     expect(parseArgs(['stop', 'extra'])).toEqual({
+      kind: 'error',
+      message: 'unknown argument: extra',
+    })
+    expect(parseArgs(['update', 'extra'])).toEqual({
+      kind: 'error',
+      message: 'unknown argument: extra',
+    })
+    expect(parseArgs(['--version', 'extra'])).toEqual({
+      kind: 'error',
+      message: 'unknown argument: extra',
+    })
+    expect(parseArgs(['-v', 'extra'])).toEqual({
       kind: 'error',
       message: 'unknown argument: extra',
     })

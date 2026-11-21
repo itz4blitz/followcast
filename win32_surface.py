@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import threading
 import time
+import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -150,6 +153,31 @@ def map_cursor_position(
     return (rx, ry)
 
 
+_SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/itz4blitz/followcast/releases/latest"
+
+
+def parse_semver(version: str) -> tuple[int, int, int] | None:
+    match = _SEMVER_RE.match(version.strip())
+    if match is None:
+        return None
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+def is_newer_version(current: str, latest: str) -> bool:
+    left = parse_semver(current)
+    right = parse_semver(latest)
+    if left is None or right is None:
+        return False
+    return right > left
+
+
+def format_update_prompt(latest_version: str) -> str:
+    clean = latest_version.strip()
+    tag = clean if clean.startswith("v") else f"v{clean}"
+    return f"A new version of Followcast is available ({tag}). Would you like to upgrade?"
+
+
 def parse_privacy_state(raw: str) -> dict[str, Any]:
     try:
         parsed = json.loads(raw)
@@ -203,6 +231,11 @@ def _run_surface() -> int:
     WM_HOTKEY = 0x0312
     WM_APP = 0x8000
     WM_TRAYICON = WM_APP + 1
+    WM_UPDATE_AVAILABLE = WM_APP + 2
+    MB_YESNO = 0x00000004
+    MB_ICONINFORMATION = 0x00000040
+    MB_SETFOREGROUND = 0x00010000
+    IDYES = 6
     WM_LBUTTONUP = 0x0202
     WM_RBUTTONUP = 0x0205
     WM_CONTEXTMENU = 0x007B
@@ -492,6 +525,13 @@ def _run_surface() -> int:
     user32.SetForegroundWindow.restype = wintypes.BOOL
     user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     user32.ShowWindow.restype = wintypes.BOOL
+    user32.MessageBoxW.argtypes = [
+        wintypes.HWND,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.UINT,
+    ]
+    user32.MessageBoxW.restype = ctypes.c_int
     gdi32.Ellipse.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     gdi32.Ellipse.restype = wintypes.BOOL
     gdi32.CreatePen.argtypes = [ctypes.c_int, ctypes.c_int, wintypes.COLORREF]
@@ -505,6 +545,7 @@ def _run_surface() -> int:
         "monitors": list_monitors(),
         "monitors_at": time.monotonic(),
         "tray_status": "idle",
+        "available_update": None,
     }
     hwnd_box: list[int] = [0]
     privacy_file = runtime_state_path(os.environ, tempfile.gettempdir())
@@ -587,6 +628,47 @@ def _run_surface() -> int:
         nid.szTip = labels.get(status_kind, "Followcast")
         shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
 
+    def launch_upgrade(hwnd: int) -> None:
+        install_cmd = (
+            "irm https://raw.githubusercontent.com/itz4blitz/followcast/master/install.ps1 | iex; "
+            "Start-Process followcast.exe"
+        )
+        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+        try:
+            subprocess.Popen(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    install_cmd,
+                ],
+                creationflags=creationflags,
+                close_fds=True,
+            )
+        except OSError:
+            return
+        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+
+    def prompt_for_update(hwnd: int) -> None:
+        with lock:
+            latest = state["available_update"]
+        if not isinstance(latest, str) or latest == "":
+            return
+        answer = int(
+            user32.MessageBoxW(
+                hwnd,
+                format_update_prompt(latest),
+                "Followcast Update",
+                MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND,
+            )
+        )
+        if answer == IDYES:
+            launch_upgrade(hwnd)
+
     def show_tray_menu(hwnd: int) -> None:
         menu = user32.CreatePopupMenu()
         if not menu:
@@ -600,6 +682,11 @@ def _run_surface() -> int:
                 "idle": "Followcast — Idle",
             }.get(str(state["tray_status"]), "Followcast")
             user32.AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, status_label)
+            with lock:
+                available_update = state["available_update"]
+            if isinstance(available_update, str) and available_update != "":
+                tag = available_update if available_update.startswith("v") else f"v{available_update}"
+                user32.AppendMenuW(menu, MF_STRING, 4, f"Upgrade to {tag}...")
             user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
             pause_text = "Resume Share (Ctrl+Shift+H)" if is_paused else "Hide Share (Ctrl+Shift+H)"
             user32.AppendMenuW(menu, MF_STRING, 1, pause_text)
@@ -662,6 +749,8 @@ def _run_surface() -> int:
                 user32.SetForegroundWindow(hwnd)
             elif chosen == 3:
                 user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            elif chosen == 4:
+                prompt_for_update(hwnd)
             elif chosen in cmd_actions:
                 kind, target = cmd_actions[chosen]
                 if kind == "monitor":
@@ -851,6 +940,9 @@ def _run_surface() -> int:
             if event_code in (WM_RBUTTONUP, WM_LBUTTONUP, WM_CONTEXTMENU):
                 show_tray_menu(hwnd)
             return 0
+        if msg == WM_UPDATE_AVAILABLE:
+            prompt_for_update(hwnd)
+            return 0
         if msg == WM_CLOSE:
             user32.DestroyWindow(hwnd)
             return 0
@@ -927,6 +1019,30 @@ def _run_surface() -> int:
             user32.PostMessageW(hwnd_box[0], WM_CLOSE, 0, 0)
 
     threading.Thread(target=_read_stdin, daemon=True).start()
+
+    def _check_for_updates() -> None:
+        if os.environ.get("FOLLOWCAST_NO_UPDATE_CHECK") == "1":
+            return
+        current = os.environ.get("FOLLOWCAST_VERSION", "")
+        if current == "":
+            return
+        try:
+            req = urllib.request.Request(
+                GITHUB_LATEST_RELEASE_URL,
+                headers={"User-Agent": "followcast-updater"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            tag = data.get("tag_name") if isinstance(data, dict) else None
+            if isinstance(tag, str) and is_newer_version(current, tag):
+                with lock:
+                    state["available_update"] = tag
+                if hwnd_box[0]:
+                    user32.PostMessageW(hwnd_box[0], WM_UPDATE_AVAILABLE, 0, 0)
+        except Exception:
+            return
+
+    threading.Thread(target=_check_for_updates, daemon=True).start()
 
     msg = wintypes.MSG()
     try:

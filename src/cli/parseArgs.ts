@@ -1,5 +1,7 @@
 export type ParsedArgs =
   | { readonly kind: 'help' }
+  | { readonly kind: 'version' }
+  | { readonly kind: 'update' }
   | { readonly kind: 'run'; readonly denyClasses: readonly string[] }
   | { readonly kind: 'status' }
   | { readonly kind: 'stop' }
@@ -42,6 +44,12 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
   }
   if (argv[0] === 'stop') {
     return noExtraArgs(argv, { kind: 'stop' })
+  }
+  if (argv[0] === 'update') {
+    return noExtraArgs(argv, { kind: 'update' })
+  }
+  if (argv[0] === '--version' || argv[0] === '-v') {
+    return noExtraArgs(argv, { kind: 'version' })
   }
   if (argv[0] === 'policy') {
     if (argv.length === 1) {

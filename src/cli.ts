@@ -26,6 +26,74 @@ import {
 } from './runtime.ts'
 import { createWindowsDesktopPort, type WindowsDesktopCommand } from './windows/port.ts'
 
+const APP_VERSION = '0.6.2'
+const GITHUB_LATEST_URL = 'https://api.github.com/repos/itz4blitz/followcast/releases/latest'
+
+function readAppVersion(packageRoot: string): string {
+  try {
+    const raw: unknown = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
+    if (
+      typeof raw === 'object' &&
+      raw !== null &&
+      'version' in raw &&
+      typeof raw.version === 'string' &&
+      raw.version !== ''
+    ) {
+      return raw.version
+    }
+  } catch {
+    // Fall back to embedded version in standalone SEA builds.
+  }
+  return APP_VERSION
+}
+
+async function fetchLatestReleaseTag(): Promise<string> {
+  const response = await fetch(GITHUB_LATEST_URL, {
+    headers: { 'User-Agent': 'followcast-updater' },
+  })
+  if (!response.ok) {
+    throw new Error(`failed to check for updates (HTTP ${String(response.status)})`)
+  }
+  const body: unknown = await response.json()
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'tag_name' in body &&
+    typeof body.tag_name === 'string' &&
+    body.tag_name !== ''
+  ) {
+    return body.tag_name
+  }
+  throw new Error('latest release response missing tag_name')
+}
+
+function runUpgradeInstaller(isWindows: boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const command = isWindows ? 'powershell.exe' : 'sh'
+    const args = isWindows
+      ? [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          'irm https://raw.githubusercontent.com/itz4blitz/followcast/master/install.ps1 | iex',
+        ]
+      : [
+          '-c',
+          'curl -fsSL https://raw.githubusercontent.com/itz4blitz/followcast/master/install.sh | sh',
+        ]
+    const child = spawn(command, args, { stdio: 'inherit' })
+    child.once('error', reject)
+    child.once('exit', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`upgrade installer exited with code ${String(code)}`))
+      }
+    })
+  })
+}
+
 function resolvePackageRoot(): string {
   if (typeof import.meta.url === 'string' && import.meta.url !== '') {
     return join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -147,6 +215,7 @@ async function main(): Promise<void> {
   })
 
   const packageRoot = resolvePackageRoot()
+  const version = readAppVersion(packageRoot)
   const policy = diskPolicy(process.env)
   const runtimeDir = runtimeDirFromEnv(process.env, tmpdir())
   const privacyCard = filePrivacyCard(runtimeDir)
@@ -212,6 +281,11 @@ async function main(): Promise<void> {
     stdout: process.stdout,
     stderr: process.stderr,
     policy,
+    version,
+    updater: {
+      fetchLatest: fetchLatestReleaseTag,
+      apply: () => runUpgradeInstaller(isWindows),
+    },
     daemon: {
       acquire: () => acquirePidLock(lockPath, pidLockIo),
       stop: () => stopRunningDaemon(lockPath, pidLockIo),
@@ -232,7 +306,7 @@ async function main(): Promise<void> {
           spawn: createNodeSpawn((command, args) => {
             const child = spawn(command, [...args], {
               stdio: ['pipe', 'ignore', 'inherit'],
-              env: dummySurfaceEnv(process.env),
+              env: { ...dummySurfaceEnv(process.env), FOLLOWCAST_VERSION: version },
               windowsHide: true,
             })
             const stdin = child.stdin

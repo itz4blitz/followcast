@@ -14,6 +14,7 @@ import {
   type DesktopSnapshot,
   type FollowOptions,
 } from '../domain/types.ts'
+import { isNewerVersion } from '../domain/updateCheck.ts'
 import type { FollowcastPorts } from '../ports.ts'
 import { parseArgs } from './parseArgs.ts'
 
@@ -26,6 +27,8 @@ Usage:
   followcast hide
   followcast resume
   followcast toggle
+  followcast update
+  followcast --version
   followcast --deny-class zoom --deny-class skype
   followcast policy
   followcast policy set-monitor <name> on|off
@@ -47,6 +50,11 @@ type DaemonIo = {
   stop(): boolean
 }
 
+type UpdateIo = {
+  fetchLatest(): Promise<string>
+  apply(tag: string): Promise<void>
+}
+
 export type CliIo = {
   readonly argv: readonly string[]
   readonly stdout: { write(chunk: string): void }
@@ -56,6 +64,8 @@ export type CliIo = {
   readonly policy?: PolicyIo
   readonly snapshot?: () => Promise<DesktopSnapshot>
   readonly daemon?: DaemonIo
+  readonly updater?: UpdateIo
+  readonly version?: string
 }
 
 function formatError(error: unknown): string {
@@ -69,6 +79,10 @@ export async function buildCliMain(io: CliIo): Promise<number> {
   const parsed = parseArgs(io.argv)
   if (parsed.kind === 'help') {
     io.stdout.write(USAGE)
+    return 0
+  }
+  if (parsed.kind === 'version') {
+    io.stdout.write(`${io.version ?? '0.0.0'}\n`)
     return 0
   }
   if (parsed.kind === 'error') {
@@ -89,6 +103,9 @@ export async function buildCliMain(io: CliIo): Promise<number> {
   }
   if (parsed.kind === 'stop') {
     return handleStop(io)
+  }
+  if (parsed.kind === 'update') {
+    return handleUpdate(io)
   }
   const options: FollowOptions = {
     selfClasses: DEFAULT_FOLLOW_OPTIONS.selfClasses,
@@ -176,6 +193,27 @@ function handleStop(io: CliIo): number {
   const stopped = io.daemon.stop()
   io.stdout.write(stopped ? 'Followcast stopped.\n' : 'Followcast is not running.\n')
   return 0
+}
+
+async function handleUpdate(io: CliIo): Promise<number> {
+  if (io.updater === undefined) {
+    io.stderr.write('update is unavailable\n')
+    return 1
+  }
+  const current = io.version ?? '0.0.0'
+  try {
+    const latest = await io.updater.fetchLatest()
+    if (!isNewerVersion(current, latest)) {
+      io.stdout.write(`Followcast is up to date (v${current}).\n`)
+      return 0
+    }
+    await io.updater.apply(latest)
+    io.stdout.write(`Upgraded Followcast to ${latest}.\n`)
+    return 0
+  } catch (error) {
+    io.stderr.write(`${formatError(error)}\n`)
+    return 1
+  }
 }
 
 async function handleStatus(io: CliIo): Promise<number> {

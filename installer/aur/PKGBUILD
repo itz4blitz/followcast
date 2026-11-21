@@ -1,6 +1,6 @@
 # Maintainer: itz4blitz <https://github.com/itz4blitz/followcast>
 pkgname=followcast-bin
-pkgver=0.6.1
+pkgver=0.6.2
 pkgrel=1
 pkgdesc='Cross-platform share window for Hyprland that follows the focused display with privacy cards'
 arch=('x86_64')
